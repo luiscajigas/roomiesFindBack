@@ -36,13 +36,19 @@ router.post('/registro', async (req, res) => {
       [nombre, email, passwordHash]
     );
     const usuario = usuarioResult.rows[0];
+    const zonaResult = await client.query(
+      `INSERT INTO zonas (nombre) VALUES ($1)
+       ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+       RETURNING id`,
+      [zona]
+    );
 
     await client.query(
       `INSERT INTO perfiles
-        (usuario_id, presupuesto, zona, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion)
+        (usuario_id, presupuesto, zona_id, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [
-        usuario.id, presupuesto, zona, horario, limpieza ?? 3, tolerancia_ruido ?? 3,
+        usuario.id, presupuesto, zonaResult.rows[0].id, horario, limpieza ?? 3, tolerancia_ruido ?? 3,
         frecuencia_visitas ?? 'ocasional', !!tiene_mascotas, acepta_mascotas ?? true, descripcion || null
       ]
     );

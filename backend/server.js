@@ -8,8 +8,12 @@ const compatibilidadRoutes = require('./routes/compatibilidad');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const origenesPermitidos = (process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4300'))
+  .split(',')
+  .map((origen) => origen.trim())
+  .filter(Boolean);
 
-app.use(cors());
+app.use(cors({ origin: origenesPermitidos.length ? origenesPermitidos : false }));
 app.use(express.json());
 
 app.get('/api/salud', (req, res) => {

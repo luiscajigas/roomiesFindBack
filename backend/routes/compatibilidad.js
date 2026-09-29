@@ -18,7 +18,10 @@ router.post('/registrar', requiereAuth, async (req, res) => {
   }
 
   await pool.query(
-    'INSERT INTO consultas_compatibilidad (usuario_id, candidato_id, score) VALUES ($1, $2, $3)',
+    `INSERT INTO recomendaciones (usuario_id, candidato_id, score)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (usuario_id, candidato_id)
+     DO UPDATE SET score = EXCLUDED.score, actualizado_en = now()`,
     [req.usuarioId, candidatoId, score]
   );
 

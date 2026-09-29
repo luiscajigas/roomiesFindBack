@@ -10,8 +10,10 @@ const router = express.Router();
  */
 router.get('/me', requiereAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT u.id, u.nombre, u.email, p.*
-     FROM usuarios u JOIN perfiles p ON p.usuario_id = u.id
+    `SELECT u.id, u.nombre, u.email, p.*, z.nombre AS zona
+     FROM usuarios u
+     JOIN perfiles p ON p.usuario_id = u.id
+     JOIN zonas z ON z.id = p.zona_id
      WHERE u.id = $1`,
     [req.usuarioId]
   );
@@ -29,10 +31,24 @@ router.put('/me', requiereAuth, async (req, res) => {
     frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion
   } = req.body;
 
-  const result = await pool.query(
-    `UPDATE perfiles SET
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let zonaId = null;
+    if (zona !== undefined) {
+      const zonaResult = await client.query(
+        `INSERT INTO zonas (nombre) VALUES ($1)
+         ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+         RETURNING id`,
+        [zona]
+      );
+      zonaId = zonaResult.rows[0].id;
+    }
+
+    await client.query(
+      `UPDATE perfiles SET
        presupuesto = COALESCE($1, presupuesto),
-       zona = COALESCE($2, zona),
+       zona_id = COALESCE($2, zona_id),
        horario = COALESCE($3, horario),
        limpieza = COALESCE($4, limpieza),
        tolerancia_ruido = COALESCE($5, tolerancia_ruido),
@@ -41,12 +57,24 @@ router.put('/me', requiereAuth, async (req, res) => {
        acepta_mascotas = COALESCE($8, acepta_mascotas),
        descripcion = COALESCE($9, descripcion),
        actualizado_en = now()
-     WHERE usuario_id = $10
-     RETURNING *`,
-    [presupuesto, zona, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, req.usuarioId]
-  );
+       WHERE usuario_id = $10`,
+      [presupuesto, zonaId, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, req.usuarioId]
+    );
+    await client.query('COMMIT');
 
-  res.json(result.rows[0]);
+    const result = await client.query(
+      `SELECT p.*, z.nombre AS zona FROM perfiles p
+       JOIN zonas z ON z.id = p.zona_id WHERE p.usuario_id = $1`,
+      [req.usuarioId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo actualizar el perfil.' });
+  } finally {
+    client.release();
+  }
 });
 
 /**
@@ -57,8 +85,10 @@ router.put('/me', requiereAuth, async (req, res) => {
  */
 router.get('/candidatos', requiereAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT u.id, u.nombre, p.*
-     FROM usuarios u JOIN perfiles p ON p.usuario_id = u.id
+    `SELECT u.id, u.nombre, p.*, z.nombre AS zona
+     FROM usuarios u
+     JOIN perfiles p ON p.usuario_id = u.id
+     JOIN zonas z ON z.id = p.zona_id
      WHERE u.id != $1
      ORDER BY u.id`,
     [req.usuarioId]
