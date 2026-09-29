@@ -1,0 +1,94 @@
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const pool = require('../db');
+const { SECRETO } = require('../middleware/auth');
+
+const router = express.Router();
+
+function firmarToken(usuarioId) {
+  return jwt.sign({ usuarioId }, SECRETO, { expiresIn: '7d' });
+}
+
+/**
+ * POST /api/auth/registro
+ * Crea el usuario y su perfil en una sola petición (más simple para el
+ * flujo de onboarding: nunca hay un usuario sin perfil).
+ */
+router.post('/registro', async (req, res) => {
+  const {
+    nombre, email, password,
+    presupuesto, zona, horario, limpieza, tolerancia_ruido,
+    frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion
+  } = req.body;
+
+  if (!nombre || !email || !password || !presupuesto || !zona || !horario) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios del registro o del perfil.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const usuarioResult = await client.query(
+      'INSERT INTO usuarios (nombre, email, password_hash) VALUES ($1, $2, $3) RETURNING id, nombre, email',
+      [nombre, email, passwordHash]
+    );
+    const usuario = usuarioResult.rows[0];
+
+    await client.query(
+      `INSERT INTO perfiles
+        (usuario_id, presupuesto, zona, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        usuario.id, presupuesto, zona, horario, limpieza ?? 3, tolerancia_ruido ?? 3,
+        frecuencia_visitas ?? 'ocasional', !!tiene_mascotas, acepta_mascotas ?? true, descripcion || null
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    const token = firmarToken(usuario.id);
+    res.status(201).json({ token, usuario });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Error al registrar el usuario.' });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /api/auth/login
+ */
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email y password son obligatorios.' });
+  }
+
+  const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+  const usuario = result.rows[0];
+
+  if (!usuario) {
+    return res.status(401).json({ error: 'Credenciales inválidas.' });
+  }
+
+  const coincide = await bcrypt.compare(password, usuario.password_hash);
+  if (!coincide) {
+    return res.status(401).json({ error: 'Credenciales inválidas.' });
+  }
+
+  const token = firmarToken(usuario.id);
+  res.json({
+    token,
+    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email }
+  });
+});
+
+module.exports = router;
