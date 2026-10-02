@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { SECRETO } = require('../middleware/auth');
+const { esUrlImagenValida } = require('../utils/validacion');
 
 const router = express.Router();
 
@@ -19,11 +20,14 @@ router.post('/registro', async (req, res) => {
   const {
     nombre, email, password,
     presupuesto, zona, horario, limpieza, tolerancia_ruido,
-    frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion
+    frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url
   } = req.body;
 
   if (!nombre || !email || !password || !presupuesto || !zona || !horario) {
     return res.status(400).json({ error: 'Faltan campos obligatorios del registro o del perfil.' });
+  }
+  if (foto_url && !esUrlImagenValida(foto_url)) {
+    return res.status(400).json({ error: 'El enlace de la foto debe ser una URL válida que use HTTP o HTTPS.' });
   }
 
   const client = await pool.connect();
@@ -45,11 +49,11 @@ router.post('/registro', async (req, res) => {
 
     await client.query(
       `INSERT INTO perfiles
-        (usuario_id, presupuesto, zona_id, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        (usuario_id, presupuesto, zona_id, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         usuario.id, presupuesto, zonaResult.rows[0].id, horario, limpieza ?? 3, tolerancia_ruido ?? 3,
-        frecuencia_visitas ?? 'ocasional', !!tiene_mascotas, acepta_mascotas ?? true, descripcion || null
+        frecuencia_visitas ?? 'ocasional', !!tiene_mascotas, acepta_mascotas ?? true, descripcion || null, foto_url || null
       ]
     );
 

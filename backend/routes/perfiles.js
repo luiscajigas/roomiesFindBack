@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requiereAuth } = require('../middleware/auth');
+const { esUrlImagenValida } = require('../utils/validacion');
 
 const router = express.Router();
 
@@ -28,8 +29,11 @@ router.get('/me', requiereAuth, async (req, res) => {
 router.put('/me', requiereAuth, async (req, res) => {
   const {
     presupuesto, zona, horario, limpieza, tolerancia_ruido,
-    frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion
+    frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url
   } = req.body;
+  if (foto_url && !esUrlImagenValida(foto_url)) {
+    return res.status(400).json({ error: 'El enlace de la foto debe ser una URL válida que use HTTP o HTTPS.' });
+  }
 
   const client = await pool.connect();
   try {
@@ -56,9 +60,10 @@ router.put('/me', requiereAuth, async (req, res) => {
        tiene_mascotas = COALESCE($7, tiene_mascotas),
        acepta_mascotas = COALESCE($8, acepta_mascotas),
        descripcion = COALESCE($9, descripcion),
+       foto_url = COALESCE($10, foto_url),
        actualizado_en = now()
-       WHERE usuario_id = $10`,
-      [presupuesto, zonaId, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, req.usuarioId]
+       WHERE usuario_id = $11`,
+      [presupuesto, zonaId, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url, req.usuarioId]
     );
     await client.query('COMMIT');
 

@@ -26,8 +26,12 @@ CREATE TABLE IF NOT EXISTS perfiles (
   tiene_mascotas BOOLEAN NOT NULL DEFAULT false,
   acepta_mascotas BOOLEAN NOT NULL DEFAULT true,
   descripcion TEXT,
+  foto_url TEXT CHECK (foto_url IS NULL OR foto_url ~* '^https?://'),
   actualizado_en TIMESTAMP NOT NULL DEFAULT now()
 );
+
+ALTER TABLE perfiles
+  ADD COLUMN IF NOT EXISTS foto_url TEXT CHECK (foto_url IS NULL OR foto_url ~* '^https?://');
 
 CREATE TABLE IF NOT EXISTS recomendaciones (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
