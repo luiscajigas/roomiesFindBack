@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const pool = require('./db');
+const { uploadsDir, prepararDirectorioFotos } = require('./utils/upload');
 
 const authRoutes = require('./routes/auth');
 const perfilesRoutes = require('./routes/perfiles');
@@ -15,6 +17,7 @@ const origenesPermitidos = (process.env.FRONTEND_URL || (process.env.NODE_ENV ==
 
 app.use(cors({ origin: origenesPermitidos.length ? origenesPermitidos : false }));
 app.use(express.json());
+app.use('/uploads', express.static(uploadsDir, { index: false }));
 
 app.get('/api/salud', (req, res) => {
   res.json({ estado: 'ok', servicio: 'roomies-backend' });
@@ -29,6 +32,23 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend de Roomies corriendo en http://localhost:${PORT}`);
+async function iniciarServidor() {
+  await prepararDirectorioFotos();
+  await pool.query(`
+    ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS foto_url TEXT;
+    ALTER TABLE perfiles DROP CONSTRAINT IF EXISTS perfiles_foto_url_check;
+    ALTER TABLE perfiles ADD CONSTRAINT perfiles_foto_url_check CHECK (
+      foto_url IS NULL OR
+      foto_url ~* '^https?://' OR
+      foto_url ~ '^/uploads/[A-Za-z0-9._-]+$'
+    );
+  `);
+  app.listen(PORT, () => {
+    console.log(`Backend de Roomies corriendo en http://localhost:${PORT}`);
+  });
+}
+
+iniciarServidor().catch((error) => {
+  console.error('No se pudo preparar la base de datos o el almacenamiento de fotos:', error);
+  pool.end().finally(() => process.exit(1));
 });

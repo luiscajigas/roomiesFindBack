@@ -26,12 +26,26 @@ CREATE TABLE IF NOT EXISTS perfiles (
   tiene_mascotas BOOLEAN NOT NULL DEFAULT false,
   acepta_mascotas BOOLEAN NOT NULL DEFAULT true,
   descripcion TEXT,
-  foto_url TEXT CHECK (foto_url IS NULL OR foto_url ~* '^https?://'),
+  foto_url TEXT CHECK (
+    foto_url IS NULL OR
+    foto_url ~* '^https?://' OR
+    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$'
+  ), -- Ruta relativa del archivo de perfil guardado por el backend
   actualizado_en TIMESTAMP NOT NULL DEFAULT now()
 );
 
 ALTER TABLE perfiles
-  ADD COLUMN IF NOT EXISTS foto_url TEXT CHECK (foto_url IS NULL OR foto_url ~* '^https?://');
+  ADD COLUMN IF NOT EXISTS foto_url TEXT;
+
+ALTER TABLE perfiles
+  DROP CONSTRAINT IF EXISTS perfiles_foto_url_check;
+
+ALTER TABLE perfiles
+  ADD CONSTRAINT perfiles_foto_url_check CHECK (
+    foto_url IS NULL OR
+    foto_url ~* '^https?://' OR
+    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$'
+  );
 
 CREATE TABLE IF NOT EXISTS recomendaciones (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
