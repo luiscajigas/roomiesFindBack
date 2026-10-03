@@ -1,30 +1,17 @@
-const fs = require('node:fs');
 const path = require('node:path');
-const { randomUUID } = require('node:crypto');
+const fs = require('node:fs');
 const multer = require('multer');
 
 const uploadsDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.resolve(__dirname, '..', 'uploads');
-const extensionesPermitidas = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif'
-};
-
-const almacenamiento = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (req, file, callback) => {
-    callback(null, `${randomUUID()}${extensionesPermitidas[file.mimetype]}`);
-  }
-});
+const tiposPermitidos = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const subirFoto = multer({
-  storage: almacenamiento,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, callback) => {
-    if (!extensionesPermitidas[file.mimetype]) {
+    if (!tiposPermitidos.has(file.mimetype)) {
       const error = new Error('Elige una imagen JPG, PNG, WEBP o GIF.');
       error.status = 400;
       callback(error);
@@ -57,17 +44,10 @@ async function prepararDirectorioFotos() {
   await fs.promises.mkdir(uploadsDir, { recursive: true });
 }
 
-async function eliminarFoto(ruta) {
-  if (!ruta) return;
-  try {
-    await fs.promises.unlink(ruta);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-}
-
 async function esImagenReal(file) {
-  const buffer = await fs.promises.readFile(file.path);
+  const buffer = file.buffer;
+  if (!Buffer.isBuffer(buffer)) return false;
+
   switch (file.mimetype) {
     case 'image/jpeg':
       return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
@@ -82,4 +62,4 @@ async function esImagenReal(file) {
   }
 }
 
-module.exports = { uploadsDir, recibirFoto, prepararDirectorioFotos, eliminarFoto, esImagenReal };
+module.exports = { uploadsDir, recibirFoto, prepararDirectorioFotos, esImagenReal };

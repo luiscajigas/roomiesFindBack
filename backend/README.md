@@ -10,7 +10,7 @@ API Node.js/Express con PostgreSQL. Esta carpeta puede desplegarse como reposito
    - `DATABASE_URL`: Internal Database URL del PostgreSQL creado en Render.
    - `JWT_SECRET`: secreto largo, aleatorio y privado.
    - `FRONTEND_URL`: dominio HTTPS de Vercel, sin barra final.
-   - `UPLOADS_DIR` (opcional): directorio para fotos; en Render configúralo con la ruta de un Persistent Disk, por ejemplo `/var/data/roomies-uploads`.
+   - `UPLOADS_DIR` (opcional): directorio para servir fotos antiguas que se guardaron en disco antes de usar almacenamiento en PostgreSQL.
    - `NODE_ENV`: `production`.
 4. Render asigna `PORT` automáticamente. No configures la URL interna de Postgres en el frontend.
 5. Comprueba `/api/salud` en el dominio público del servicio.
@@ -23,4 +23,4 @@ Configura `DATABASE_URL` y `JWT_SECRET` en `.env` usando `.env.example` como ref
 
 El frontend se configura con el dominio público de este servicio en `src/environments/environment.prod.ts`, añadiendo `/api` al final. Después agrega el dominio de Vercel a `FRONTEND_URL` en Render y vuelve a desplegar el backend.
 
-Las fotos de perfil se suben desde el dispositivo y se guardan en el directorio local `uploads/` (máximo 5 MB; JPG, PNG, WEBP o GIF). En Render, el sistema de archivos normal no es persistente: adjunta un Persistent Disk al backend, configura `UPLOADS_DIR` con su punto de montaje y conserva ese disco para que las fotos sigan disponibles después de reiniciar o desplegar el servicio. La ruta de la foto se guarda en `perfiles.foto_url`.
+Las fotos nuevas se guardan en la tabla `fotos_perfil` de PostgreSQL (máximo 5 MB; JPG, PNG, WEBP o GIF), por lo que persisten después de cerrar sesión, reiniciar o desplegar el backend y se pueden mostrar en otras cuentas. `perfiles.foto_url` contiene la ruta del endpoint de imagen. El directorio `uploads/` se conserva únicamente para servir archivos de instalaciones anteriores; los archivos locales que ya se hayan perdido no se pueden recuperar y tendrán que volver a subirse.

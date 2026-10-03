@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { SECRETO } = require('../middleware/auth');
-const { recibirFoto, eliminarFoto, esImagenReal } = require('../utils/upload');
+const { recibirFoto, esImagenReal } = require('../utils/upload');
 
 const router = express.Router();
 
@@ -24,17 +24,14 @@ router.post('/registro', recibirFoto, async (req, res) => {
   } = req.body;
 
   if (!nombre || !email || !password || !presupuesto || !zona || !horario) {
-    await eliminarFoto(req.file?.path).catch((error) => console.error('No se pudo limpiar la foto temporal:', error));
     return res.status(400).json({ error: 'Faltan campos obligatorios del registro o del perfil.' });
   }
   if (req.file) {
     try {
       if (!(await esImagenReal(req.file))) {
-        await eliminarFoto(req.file.path);
         return res.status(400).json({ error: 'El archivo seleccionado no es una imagen válida.' });
       }
     } catch (error) {
-      await eliminarFoto(req.file.path).catch((cleanupError) => console.error('No se pudo limpiar la foto temporal:', cleanupError));
       console.error('No se pudo verificar la foto recibida:', error);
       return res.status(500).json({ error: 'No se pudo verificar la foto seleccionada.' });
     }
@@ -44,7 +41,6 @@ router.post('/registro', recibirFoto, async (req, res) => {
   try {
     client = await pool.connect();
   } catch (error) {
-    await eliminarFoto(req.file?.path).catch((cleanupError) => console.error('No se pudo limpiar la foto temporal:', cleanupError));
     console.error('No se pudo conectar con la base de datos durante el registro:', error);
     return res.status(500).json({ error: 'No se pudo completar el registro.' });
   }
@@ -64,7 +60,7 @@ router.post('/registro', recibirFoto, async (req, res) => {
       [zona]
     );
 
-    const fotoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const fotoUrl = req.file ? `/api/perfiles/${usuario.id}/foto` : null;
     await client.query(
       `INSERT INTO perfiles
         (usuario_id, presupuesto, zona_id, horario, limpieza, tolerancia_ruido, frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url)
@@ -77,13 +73,20 @@ router.post('/registro', recibirFoto, async (req, res) => {
       ]
     );
 
+    if (req.file) {
+      await client.query(
+        `INSERT INTO fotos_perfil (usuario_id, tipo_mime, contenido)
+         VALUES ($1, $2, $3)`,
+        [usuario.id, req.file.mimetype, req.file.buffer]
+      );
+    }
+
     await client.query('COMMIT');
 
     const token = firmarToken(usuario.id);
     res.status(201).json({ token, usuario });
   } catch (err) {
     await client.query('ROLLBACK');
-    await eliminarFoto(req.file?.path).catch((error) => console.error('No se pudo limpiar la foto temporal:', error));
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
     }

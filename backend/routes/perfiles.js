@@ -2,8 +2,35 @@ const express = require('express');
 const pool = require('../db');
 const { requiereAuth } = require('../middleware/auth');
 const { esUrlImagenValida } = require('../utils/validacion');
+const { recibirFoto, esImagenReal } = require('../utils/upload');
 
 const router = express.Router();
+
+/**
+ * GET /api/perfiles/:usuarioId/foto
+ * Sirve la foto de perfil guardada en PostgreSQL.
+ */
+router.get('/:usuarioId/foto', async (req, res) => {
+  const usuarioId = Number(req.params.usuarioId);
+  if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) {
+    return res.status(400).json({ error: 'Identificador de perfil inválido.' });
+  }
+
+  const result = await pool.query(
+    'SELECT tipo_mime, contenido FROM fotos_perfil WHERE usuario_id = $1',
+    [usuarioId]
+  );
+  const foto = result.rows[0];
+  if (!foto) return res.status(404).json({ error: 'Foto de perfil no encontrada.' });
+
+  res.set({
+    'Content-Type': foto.tipo_mime,
+    'Content-Length': foto.contenido.length,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff'
+  });
+  res.send(foto.contenido);
+});
 
 /**
  * GET /api/perfiles/me
@@ -20,6 +47,62 @@ router.get('/me', requiereAuth, async (req, res) => {
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'Perfil no encontrado.' });
   res.json(result.rows[0]);
+});
+
+/**
+ * PUT /api/perfiles/me/foto
+ * Guarda o reemplaza la foto del usuario autenticado en PostgreSQL.
+ */
+router.put('/me/foto', requiereAuth, recibirFoto, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Selecciona una foto para continuar.' });
+  }
+
+  try {
+    if (!(await esImagenReal(req.file))) {
+      return res.status(400).json({ error: 'El archivo seleccionado no es una imagen válida.' });
+    }
+  } catch (error) {
+    console.error('No se pudo verificar la foto recibida:', error);
+    return res.status(500).json({ error: 'No se pudo verificar la foto seleccionada.' });
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const fotoUrl = `/api/perfiles/${req.usuarioId}/foto`;
+    const perfil = await client.query(
+      `UPDATE perfiles
+       SET foto_url = $1, actualizado_en = now()
+       WHERE usuario_id = $2
+       RETURNING usuario_id`,
+      [fotoUrl, req.usuarioId]
+    );
+
+    if (!perfil.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Perfil no encontrado.' });
+    }
+
+    await client.query(
+      `INSERT INTO fotos_perfil (usuario_id, tipo_mime, contenido, actualizado_en)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (usuario_id) DO UPDATE SET
+         tipo_mime = EXCLUDED.tipo_mime,
+         contenido = EXCLUDED.contenido,
+         actualizado_en = now()`,
+      [req.usuarioId, req.file.mimetype, req.file.buffer]
+    );
+    await client.query('COMMIT');
+    res.json({ foto_url: fotoUrl });
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    console.error('No se pudo guardar la foto de perfil:', error);
+    res.status(500).json({ error: 'No se pudo guardar la foto de perfil.' });
+  } finally {
+    client?.release();
+  }
 });
 
 /**

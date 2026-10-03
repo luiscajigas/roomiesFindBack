@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS perfiles (
   foto_url TEXT CHECK (
     foto_url IS NULL OR
     foto_url ~* '^https?://' OR
-    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$'
+    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$' OR
+    foto_url ~ '^/api/perfiles/[0-9]+/foto$'
   ), -- Ruta relativa del archivo de perfil guardado por el backend
   actualizado_en TIMESTAMP NOT NULL DEFAULT now()
 );
@@ -44,8 +45,16 @@ ALTER TABLE perfiles
   ADD CONSTRAINT perfiles_foto_url_check CHECK (
     foto_url IS NULL OR
     foto_url ~* '^https?://' OR
-    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$'
+    foto_url ~ '^/uploads/[A-Za-z0-9._-]+$' OR
+    foto_url ~ '^/api/perfiles/[0-9]+/foto$'
   );
+
+CREATE TABLE IF NOT EXISTS fotos_perfil (
+  usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo_mime VARCHAR(32) NOT NULL CHECK (tipo_mime IN ('image/jpeg', 'image/png', 'image/webp', 'image/gif')),
+  contenido BYTEA NOT NULL,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS recomendaciones (
   id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
