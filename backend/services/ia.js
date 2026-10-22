@@ -23,7 +23,7 @@ function comoLista(items) {
 function construirPrompt({ nombreUsuario, nombreCandidato, score, coincidencias, conflictos }) {
   return [
     'Eres el asistente de RoomiesFind, una aplicación para encontrar compañeros de vivienda.',
-    `Explica en español por qué ${nombreUsuario} y ${nombreCandidato} tienen un ${score}% de compatibilidad.`,
+    `Explica en español, dirigida a ${nombreUsuario}, por qué ${nombreUsuario} y ${nombreCandidato} tienen un ${score}% de compatibilidad.`,
     'El puntaje ya fue calculado con reglas objetivas; tu único trabajo es interpretarlo, no modificarlo.',
     '',
     'Puntos en común:',
@@ -32,10 +32,22 @@ function construirPrompt({ nombreUsuario, nombreCandidato, score, coincidencias,
     'Posibles temas para conversar antes de vivir juntos:',
     comoLista(conflictos),
     '',
+    'Empieza directamente con la explicación: no escribas el nombre de la aplicación, encabezados ni saludos.',
+    'Estructura: primero lo que comparten y por qué facilita la convivencia, luego lo que conviene acordar, y termina con un consejo práctico y concreto.',
     'Escribe entre 90 y 130 palabras en texto corrido, sin títulos, listas ni formato markdown.',
     'Usa un tono cercano y respetuoso. No inventes datos que no estén en las listas.',
-    'Termina con un consejo práctico y concreto para la convivencia.'
+    'La respuesta debe terminar con una oración completa.'
   ].join('\n');
+}
+
+/**
+ * Si el proveedor cortó el texto a mitad de una oración, devuelve el texto
+ * hasta la última oración completa para no mostrar frases incompletas.
+ */
+function hastaUltimaOracionCompleta(texto) {
+  if (/[.!?…]["'”)]?\s*$/.test(texto)) return texto;
+  const corte = Math.max(texto.lastIndexOf('.'), texto.lastIndexOf('!'), texto.lastIndexOf('?'));
+  return corte > 40 ? texto.slice(0, corte + 1).trim() : texto;
 }
 
 /**
@@ -47,7 +59,7 @@ async function llamarGemini(modelo, apiKey, contexto) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent?key=${apiKey}`;
   const cuerpo = {
     contents: [{ role: 'user', parts: [{ text: construirPrompt(contexto) }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 280 }
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
   };
 
   const controlador = new AbortController();
@@ -80,7 +92,7 @@ async function llamarGemini(modelo, apiKey, contexto) {
   if (!texto) {
     throw new Error('El proveedor de IA no devolvió texto.');
   }
-  return texto;
+  return hastaUltimaOracionCompleta(texto);
 }
 
 function esperar(ms) {
