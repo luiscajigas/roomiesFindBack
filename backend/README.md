@@ -23,6 +23,8 @@ API Node.js/Express con PostgreSQL. Esta carpeta puede desplegarse como reposito
 
 Para minimizar llamadas al proveedor, si ya existe una explicación generada para la misma pareja con el mismo score, el endpoint devuelve la guardada en `explicaciones_ia` (`desdeCache: true`) sin volver a llamar a la IA. Si `GEMINI_API_KEY` no está configurada o el proveedor falla, responde `503` con un mensaje claro y el registro queda en estado `pendiente`.
 
+El cliente reintenta automáticamente con espera creciente cuando el proveedor responde 429 (cuota) o 503 (alta demanda), y prueba un modelo de respaldo si el configurado ya no existe (404). Los modelos se pueden ajustar con `GEMINI_MODEL`.
+
 Antes de registrar el primer usuario, conecta pgAdmin a PostgreSQL usando los datos External y ejecuta `schema.sql` en la base recién creada. No existen usuarios demo ni se necesita un archivo seed.
 
 ## Desarrollo local
