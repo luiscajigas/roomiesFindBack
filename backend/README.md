@@ -11,7 +11,7 @@ API Node.js/Express con PostgreSQL. Esta carpeta puede desplegarse como reposito
    - `JWT_SECRET`: secreto largo, aleatorio y privado.
    - `FRONTEND_URL`: dominio HTTPS de Vercel, sin barra final.
    - `GEMINI_API_KEY`: clave de Gemini para las explicaciones con IA (gratis en https://aistudio.google.com/apikey).
-   - `GEMINI_MODEL` (opcional): modelo de Gemini; por defecto `gemini-2.0-flash`.
+   - `GEMINI_MODEL` (opcional): modelo de Gemini; por defecto `gemini-3.8-flash`.
    - `UPLOADS_DIR` (opcional): directorio para servir fotos antiguas que se guardaron en disco antes de usar almacenamiento en PostgreSQL.
    - `NODE_ENV`: `production`.
 4. Render asigna `PORT` automáticamente. No configures la URL interna de Postgres en el frontend.
