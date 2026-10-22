@@ -6,7 +6,7 @@
  * objetivas. Aquí solo se interpreta ese resultado en lenguaje natural.
  */
 
-const MODELO_POR_DEFECTO = 'gemini-2.0-flash';
+const MODELO_POR_DEFECTO = 'gemini-3.8-flash';
 const TIMEOUT_MS = 20000;
 const MAX_ITEMS_LISTA = 10;
 
