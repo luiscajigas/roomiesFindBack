@@ -15,7 +15,33 @@ const origenesPermitidos = (process.env.FRONTEND_URL || (process.env.NODE_ENV ==
   .map((origen) => origen.trim())
   .filter(Boolean);
 
-app.use(cors({ origin: origenesPermitidos.length ? origenesPermitidos : false }));
+// Además de los orígenes exactos configurados, se aceptan las URLs de
+// preview que Vercel genera para el mismo proyecto (<proyecto>-*.vercel.app).
+const proyectoVercel = origenesPermitidos
+  .map((origen) => {
+    try {
+      return new URL(origen).hostname.match(/^([a-z0-9-]+)\.vercel\.app$/i)?.[1] || null;
+    } catch {
+      return null;
+    }
+  })
+  .find(Boolean);
+
+function origenPermitido(origen) {
+  if (!origen) return true; // peticiones sin Origin (curl, comprobaciones de salud)
+  if (origenesPermitidos.includes(origen)) return true;
+  if (!proyectoVercel) return false;
+  try {
+    const { hostname } = new URL(origen);
+    return hostname.endsWith('.vercel.app') && hostname.startsWith(`${proyectoVercel}-`);
+  } catch {
+    return false;
+  }
+}
+
+app.use(cors({
+  origin: (origen, callback) => callback(null, origenPermitido(origen))
+}));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir, { index: false }));
 
