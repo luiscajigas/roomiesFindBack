@@ -1,4 +1,6 @@
 require('dotenv').config();
+const fs = require('fs/promises');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
@@ -60,22 +62,9 @@ app.use((req, res) => {
 
 async function iniciarServidor() {
   await prepararDirectorioFotos();
-  await pool.query(`
-    ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS foto_url TEXT;
-    ALTER TABLE perfiles DROP CONSTRAINT IF EXISTS perfiles_foto_url_check;
-    ALTER TABLE perfiles ADD CONSTRAINT perfiles_foto_url_check CHECK (
-      foto_url IS NULL OR
-      foto_url ~* '^https?://' OR
-      foto_url ~ '^/uploads/[A-Za-z0-9._-]+$' OR
-      foto_url ~ '^/api/perfiles/[0-9]+/foto$'
-    );
-    CREATE TABLE IF NOT EXISTS fotos_perfil (
-      usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
-      tipo_mime VARCHAR(32) NOT NULL CHECK (tipo_mime IN ('image/jpeg', 'image/png', 'image/webp', 'image/gif')),
-      contenido BYTEA NOT NULL,
-      actualizado_en TIMESTAMP NOT NULL DEFAULT now()
-    );
-  `);
+  // Crea las tablas si no existen; es seguro ejecutarlo en cada arranque.
+  const esquema = await fs.readFile(path.join(__dirname, 'schema.sql'), 'utf8');
+  await pool.query(esquema);
   app.listen(PORT, () => {
     console.log(`Backend de Roomies corriendo en http://localhost:${PORT}`);
   });
