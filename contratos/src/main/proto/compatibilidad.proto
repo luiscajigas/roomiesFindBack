@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package roomiesfind.compatibilidad;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.compatibilidad";
+
+// Historial de puntajes y explicaciones guardadas. El puntaje lo calcula el
+// frontend; este servicio solo lo registra y pide que se interprete.
+service Compatibilidad {
+  rpc RegistrarRecomendacion(RegistrarRecomendacionRequest) returns (google.protobuf.Empty);
+  rpc Explicar(ExplicarRequest) returns (ExplicarResponse);
+}
+
+message RegistrarRecomendacionRequest {
+  int32 usuario_id = 1;
+  optional double candidato_id = 2;
+  optional double score = 3;
+}
+
+message ExplicarRequest {
+  int32 usuario_id = 1;
+  double candidato_id = 2;
+  double score = 3;
+  repeated string coincidencias = 4;
+  repeated string conflictos = 5;
+}
+
+message ExplicarResponse {
+  int32 id = 1;
+  string estado = 2;
+  string explicacion = 3;
+  int32 score = 4;
+  bool desde_cache = 5;
+}
