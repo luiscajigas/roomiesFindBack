@@ -3,6 +3,7 @@ const pool = require('../db');
 const { requiereAuth } = require('../middleware/auth');
 const { esUrlImagenValida, validarPreferencias } = require('../utils/validacion');
 const { recibirFoto, esImagenReal } = require('../utils/upload');
+const { esBarrioValido } = require('../utils/barrios');
 
 const router = express.Router();
 
@@ -120,6 +121,16 @@ router.put('/me', requiereAuth, async (req, res) => {
   const errorDatos = validarPreferencias(req.body);
   if (errorDatos) {
     return res.status(400).json({ error: errorDatos });
+  }
+  if (zona !== undefined && !esBarrioValido(zona)) {
+    // Las cuentas antiguas pueden conservar la zona que escribieron a mano.
+    const actual = await pool.query(
+      `SELECT z.nombre FROM perfiles p JOIN zonas z ON z.id = p.zona_id WHERE p.usuario_id = $1`,
+      [req.usuarioId]
+    );
+    if (actual.rows[0]?.nombre !== zona) {
+      return res.status(400).json({ error: 'Elige un barrio de la lista.' });
+    }
   }
 
   const client = await pool.connect();
