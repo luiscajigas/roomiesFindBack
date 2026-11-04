@@ -17,13 +17,19 @@ router.post('/registrar', requiereAuth, async (req, res) => {
   if (!candidatoId || score === undefined) {
     return res.status(400).json({ error: 'candidatoId y score son obligatorios.' });
   }
+  const idCandidato = Number(candidatoId);
+  const puntaje = Number(score);
+  if (!Number.isSafeInteger(idCandidato) || idCandidato <= 0 || idCandidato === req.usuarioId
+    || !Number.isInteger(puntaje) || puntaje < 0 || puntaje > 100) {
+    return res.status(400).json({ error: 'candidatoId o score no son válidos.' });
+  }
 
   await pool.query(
     `INSERT INTO recomendaciones (usuario_id, candidato_id, score)
      VALUES ($1, $2, $3)
      ON CONFLICT (usuario_id, candidato_id)
      DO UPDATE SET score = EXCLUDED.score, actualizado_en = now()`,
-    [req.usuarioId, candidatoId, score]
+    [req.usuarioId, idCandidato, puntaje]
   );
 
   res.status(201).json({ registrado: true });
