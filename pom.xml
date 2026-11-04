@@ -21,6 +21,7 @@
     <module>contratos</module>
     <module>comun</module>
     <module>servicios/usuarios</module>
+    <module>servicios/perfiles</module>
   </modules>
 
   <properties>
