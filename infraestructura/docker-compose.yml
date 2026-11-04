@@ -1,0 +1,110 @@
+# Levanta el sistema completo. Desde esta carpeta:
+#   docker compose --env-file ../.env up --build
+#
+# Para usar Neon en vez del Postgres local, define DATABASE_URL en ../.env.
+#
+# Solo el orquestador publica un puerto: los microservicios se hablan por gRPC
+# (HTTP/2) dentro de la red de Docker y no se pueden alcanzar desde afuera.
+
+x-entorno: &entorno
+  DATABASE_URL: ${DATABASE_URL:-postgres://roomies:roomies@postgres:5432/roomies}
+  NODE_ENV: ${NODE_ENV:-development}
+  JAVA_OPTS: ${JAVA_OPTS:--XX:+UseSerialGC -Xmx128m}
+
+x-construccion: &construccion
+  context: ..
+  dockerfile: infraestructura/docker/Dockerfile
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: roomies
+      POSTGRES_PASSWORD: roomies
+      POSTGRES_DB: roomies
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roomies"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  usuarios:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/usuarios
+    environment:
+      <<: *entorno
+      JWT_SECRET: ${JWT_SECRET:-secreto-local-de-desarrollo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  perfiles:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/perfiles
+    environment:
+      <<: *entorno
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ia:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/ia
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:+UseSerialGC -Xmx128m}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+
+  compatibilidad:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/compatibilidad
+    environment:
+      <<: *entorno
+      GRPC_USUARIOS: usuarios:9091
+      GRPC_IA: ia:9094
+    depends_on:
+      postgres:
+        condition: service_healthy
+      usuarios:
+        condition: service_started
+      ia:
+        condition: service_started
+
+  orquestador:
+    build:
+      <<: *construccion
+      args:
+        MODULO: infraestructura
+    environment:
+      <<: *entorno
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4300}
+      GRPC_USUARIOS: usuarios:9091
+      GRPC_PERFILES: perfiles:9092
+      GRPC_COMPATIBILIDAD: compatibilidad:9093
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      usuarios:
+        condition: service_started
+      perfiles:
+        condition: service_started
+      compatibilidad:
+        condition: service_started
+
+volumes:
+  datos-postgres:
