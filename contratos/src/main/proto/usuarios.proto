@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package roomiesfind.usuarios;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.usuarios";
+
+// Cuentas y sesiones. Es el único servicio que conoce contraseñas y tokens.
+service Usuarios {
+  rpc CrearUsuario(CrearUsuarioRequest) returns (SesionResponse);
+  rpc Autenticar(AutenticarRequest) returns (SesionResponse);
+  rpc ValidarToken(ValidarTokenRequest) returns (ValidarTokenResponse);
+  rpc ObtenerUsuarios(ObtenerUsuariosRequest) returns (ObtenerUsuariosResponse);
+  // Compensación: deshace una cuenta si el registro falla en un paso posterior.
+  rpc EliminarUsuario(EliminarUsuarioRequest) returns (google.protobuf.Empty);
+}
+
+message Usuario {
+  int32 id = 1;
+  string nombre = 2;
+  string email = 3;
+}
+
+message CrearUsuarioRequest {
+  string nombre = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message AutenticarRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message SesionResponse {
+  string token = 1;
+  Usuario usuario = 2;
+}
+
+message ValidarTokenRequest {
+  string token = 1;
+}
+
+message ValidarTokenResponse {
+  int32 usuario_id = 1;
+}
+
+message ObtenerUsuariosRequest {
+  repeated int32 ids = 1;
+}
+
+message ObtenerUsuariosResponse {
+  repeated Usuario usuarios = 1;
+}
+
+message EliminarUsuarioRequest {
+  int32 id = 1;
+}
