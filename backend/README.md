@@ -27,7 +27,7 @@ Para minimizar llamadas al proveedor, si ya existe una explicación generada par
 
 Si Claude falla después de sus reintentos, se usa Gemini. El cliente de Gemini reintenta con espera creciente cuando responde 429 (cuota) o 503 (alta demanda), y prueba un modelo de respaldo si el configurado ya no existe (404). Los modelos se pueden ajustar con `ANTHROPIC_MODEL` y `GEMINI_MODEL`.
 
-Antes de registrar el primer usuario, conecta pgAdmin a PostgreSQL usando los datos External y ejecuta `schema.sql` en la base recién creada. No existen usuarios demo ni se necesita un archivo seed.
+El backend crea las tablas al iniciar: solo necesita una base vacía en `DATABASE_URL`. No hay que ejecutar `schema.sql` a mano, no existen usuarios demo ni se necesita un archivo seed.
 
 ## Desarrollo local
 
