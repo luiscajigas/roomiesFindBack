@@ -23,6 +23,7 @@
     <module>servicios/usuarios</module>
     <module>servicios/perfiles</module>
     <module>servicios/compatibilidad</module>
+    <module>servicios/ia</module>
   </modules>
 
   <properties>
