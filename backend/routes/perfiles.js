@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { requiereAuth } = require('../middleware/auth');
-const { esUrlImagenValida } = require('../utils/validacion');
+const { esUrlImagenValida, validarPreferencias } = require('../utils/validacion');
 const { recibirFoto, esImagenReal } = require('../utils/upload');
 
 const router = express.Router();
@@ -116,6 +116,10 @@ router.put('/me', requiereAuth, async (req, res) => {
   } = req.body;
   if (foto_url && !esUrlImagenValida(foto_url)) {
     return res.status(400).json({ error: 'El enlace de la foto debe ser una URL válida que use HTTP o HTTPS.' });
+  }
+  const errorDatos = validarPreferencias(req.body);
+  if (errorDatos) {
+    return res.status(400).json({ error: errorDatos });
   }
 
   const client = await pool.connect();
