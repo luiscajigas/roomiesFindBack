@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package roomiesfind.perfiles;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.perfiles";
+
+// Preferencias de convivencia, barrios y fotos de perfil.
+service Perfiles {
+  // Revisa los datos antes de crear la cuenta, para no tener que deshacerla.
+  rpc ValidarRegistro(ValidarRegistroRequest) returns (google.protobuf.Empty);
+  rpc CrearPerfil(CrearPerfilRequest) returns (Perfil);
+  rpc ObtenerPerfil(ObtenerPerfilRequest) returns (Perfil);
+  rpc ActualizarPerfil(ActualizarPerfilRequest) returns (Perfil);
+  rpc ListarCandidatos(ListarCandidatosRequest) returns (ListarCandidatosResponse);
+  rpc ObtenerFoto(ObtenerFotoRequest) returns (Foto);
+  rpc GuardarFoto(GuardarFotoRequest) returns (GuardarFotoResponse);
+}
+
+message Perfil {
+  int32 usuario_id = 1;
+  int32 presupuesto = 2;
+  int32 zona_id = 3;
+  string zona = 4;
+  string horario = 5;
+  int32 limpieza = 6;
+  int32 tolerancia_ruido = 7;
+  string frecuencia_visitas = 8;
+  bool tiene_mascotas = 9;
+  bool acepta_mascotas = 10;
+  optional string descripcion = 11;
+  optional string foto_url = 12;
+  string actualizado_en = 13;
+}
+
+// Llegan como texto porque validarlos es responsabilidad de este servicio.
+message DatosPerfil {
+  optional string presupuesto = 1;
+  optional string zona = 2;
+  optional string horario = 3;
+  optional string limpieza = 4;
+  optional string tolerancia_ruido = 5;
+  optional string frecuencia_visitas = 6;
+  optional bool tiene_mascotas = 7;
+  optional bool acepta_mascotas = 8;
+  optional string descripcion = 9;
+  optional string foto_url = 10;
+}
+
+message Foto {
+  string tipo_mime = 1;
+  bytes contenido = 2;
+}
+
+message ValidarRegistroRequest {
+  DatosPerfil datos = 1;
+  optional Foto foto = 2;
+}
+
+message CrearPerfilRequest {
+  int32 usuario_id = 1;
+  DatosPerfil datos = 2;
+  optional Foto foto = 3;
+}
+
+message ObtenerPerfilRequest {
+  int32 usuario_id = 1;
+}
+
+message ActualizarPerfilRequest {
+  int32 usuario_id = 1;
+  DatosPerfil datos = 2;
+}
+
+message ListarCandidatosRequest {
+  int32 excluir_usuario_id = 1;
+}
+
+message ListarCandidatosResponse {
+  repeated Perfil perfiles = 1;
+}
+
+message ObtenerFotoRequest {
+  int32 usuario_id = 1;
+}
+
+message GuardarFotoRequest {
+  int32 usuario_id = 1;
+  Foto foto = 2;
+}
+
+message GuardarFotoResponse {
+  string foto_url = 1;
+}
