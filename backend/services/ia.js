@@ -1,13 +1,18 @@
 /**
- * Cliente del proveedor de IA (Gemini) para RoomiesFind.
+ * Cliente de IA para RoomiesFind: usa Claude y, si falla o no está
+ * configurado, Gemini como respaldo.
  *
  * La IA NUNCA decide quién es compatible: el Web Worker del frontend ya
  * calculó el score y las listas de coincidencias/conflictos con reglas
  * objetivas. Aquí solo se interpreta ese resultado en lenguaje natural.
  */
 
+const { Anthropic } = require('@anthropic-ai/sdk');
+
+const MODELO_CLAUDE_POR_DEFECTO = 'claude-opus-5-5';
 const MODELOS_POR_DEFECTO = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 const TIMEOUT_MS = 20000;
+const TIMEOUT_CLAUDE_MS = 30000;
 const MAX_INTENTOS_POR_MODELO = 3;
 const ESPERA_BASE_MS = 1200;
 const MAX_ITEMS_LISTA = 10;
@@ -48,6 +53,40 @@ function hastaUltimaOracionCompleta(texto) {
   if (/[.!?…]["'”)]?\s*$/.test(texto)) return texto;
   const corte = Math.max(texto.lastIndexOf('.'), texto.lastIndexOf('!'), texto.lastIndexOf('?'));
   return corte > 40 ? texto.slice(0, corte + 1).trim() : texto;
+}
+
+/**
+ * Genera la explicación con Claude. El SDK ya reintenta solo ante 429, 5xx y
+ * errores de conexión. Si los filtros de seguridad rechazan la petición, el
+ * parámetro fallbacks la pasa a otro modelo (Haiku no lo admite).
+ */
+async function generarConClaude(contexto) {
+  const modelo = process.env.ANTHROPIC_MODEL || MODELO_CLAUDE_POR_DEFECTO;
+  const respaldo = modelo.startsWith('claude-haiku')
+    ? {}
+    : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
+
+  const cliente = new Anthropic({ timeout: TIMEOUT_CLAUDE_MS });
+  const respuesta = await cliente.beta.messages.create({
+    model: modelo,
+    max_tokens: 4000,
+    output_config: { effort: 'low' },
+    messages: [{ role: 'user', content: construirPrompt(contexto) }],
+    ...respaldo
+  });
+
+  if (respuesta.stop_reason === 'refusal') {
+    throw new Error('Claude rechazó generar la explicación.');
+  }
+  const texto = respuesta.content
+    .filter((bloque) => bloque.type === 'text')
+    .map((bloque) => bloque.text)
+    .join('')
+    .trim();
+  if (!texto) {
+    throw new Error('Claude no devolvió texto.');
+  }
+  return hastaUltimaOracionCompleta(texto);
 }
 
 /**
@@ -100,15 +139,12 @@ function esperar(ms) {
 }
 
 /**
- * Genera la explicación con reintentos ante errores transitorios del
- * proveedor (429 cuota, 503 alta demanda, timeout) y con modelo de respaldo
- * si el configurado ya no existe (404).
+ * Genera la explicación con Gemini, con reintentos ante errores transitorios
+ * (429 cuota, 503 alta demanda, timeout) y con modelo de respaldo si el
+ * configurado ya no existe (404).
  */
-async function generarExplicacion(contexto) {
+async function generarConGemini(contexto) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY no está configurada en el servidor.');
-  }
   if (typeof fetch !== 'function') {
     throw new Error('Este servidor necesita Node.js 18 o superior (fetch no disponible).');
   }
@@ -132,6 +168,29 @@ async function generarExplicacion(contexto) {
     }
   }
   throw ultimoError || new Error('No se pudo contactar con el proveedor de IA.');
+}
+
+/**
+ * Intenta con cada proveedor configurado, en orden: Claude y luego Gemini.
+ */
+async function generarExplicacion(contexto) {
+  const proveedores = [];
+  if (process.env.ANTHROPIC_API_KEY) proveedores.push(['Claude', generarConClaude]);
+  if (process.env.GEMINI_API_KEY) proveedores.push(['Gemini', generarConGemini]);
+  if (!proveedores.length) {
+    throw new Error('Configura ANTHROPIC_API_KEY o GEMINI_API_KEY en el servidor.');
+  }
+
+  let ultimoError;
+  for (const [nombre, generar] of proveedores) {
+    try {
+      return await generar(contexto);
+    } catch (error) {
+      ultimoError = error;
+      console.warn(`Falló la IA con ${nombre}: ${error.message}`);
+    }
+  }
+  throw ultimoError;
 }
 
 module.exports = { generarExplicacion };

@@ -10,7 +10,9 @@ API Node.js/Express con PostgreSQL. Esta carpeta puede desplegarse como reposito
    - `DATABASE_URL`: Internal Database URL del PostgreSQL creado en Render.
    - `JWT_SECRET`: secreto largo, aleatorio y privado.
    - `FRONTEND_URL`: dominio HTTPS de Vercel, sin barra final.
-   - `GEMINI_API_KEY`: clave de Gemini para las explicaciones con IA (gratis en https://aistudio.google.com/apikey).
+   - `ANTHROPIC_API_KEY`: clave de Claude para las explicaciones con IA (se crea en https://console.anthropic.com).
+   - `ANTHROPIC_MODEL` (opcional): modelo de Claude; por defecto `claude-opus-5-5`.
+   - `GEMINI_API_KEY` (opcional): clave de Gemini, usada como respaldo si Claude falla (gratis en https://aistudio.google.com/apikey).
    - `GEMINI_MODEL` (opcional): modelo de Gemini; por defecto `gemini-3.8-flash`.
    - `UPLOADS_DIR` (opcional): directorio para servir fotos antiguas que se guardaron en disco antes de usar almacenamiento en PostgreSQL.
    - `NODE_ENV`: `production`.
@@ -19,11 +21,11 @@ API Node.js/Express con PostgreSQL. Esta carpeta puede desplegarse como reposito
 
 ## Explicaciones con IA
 
-`POST /api/ia/explicar` recibe el score y las listas de coincidencias y conflictos que el Web Worker del frontend ya calculó con reglas objetivas, y devuelve una explicación en lenguaje natural generada con Gemini. La IA solo interpreta el resultado; nunca decide la compatibilidad.
+`POST /api/ia/explicar` recibe el score y las listas de coincidencias y conflictos que el Web Worker del frontend ya calculó con reglas objetivas, y devuelve una explicación en lenguaje natural generada con Claude, o con Gemini como respaldo. La IA solo interpreta el resultado; nunca decide la compatibilidad.
 
-Para minimizar llamadas al proveedor, si ya existe una explicación generada para la misma pareja con el mismo score, el endpoint devuelve la guardada en `explicaciones_ia` (`desdeCache: true`) sin volver a llamar a la IA. Si `GEMINI_API_KEY` no está configurada o el proveedor falla, responde `503` con un mensaje claro y el registro queda en estado `pendiente`.
+Para minimizar llamadas al proveedor, si ya existe una explicación generada para la misma pareja con el mismo score, el endpoint devuelve la guardada en `explicaciones_ia` (`desdeCache: true`) sin volver a llamar a la IA. Si no hay ninguna clave configurada o fallan todos los proveedores, responde `503` con un mensaje claro y el registro queda en estado `pendiente`.
 
-El cliente reintenta automáticamente con espera creciente cuando el proveedor responde 429 (cuota) o 503 (alta demanda), y prueba un modelo de respaldo si el configurado ya no existe (404). Los modelos se pueden ajustar con `GEMINI_MODEL`.
+Si Claude falla después de sus reintentos, se usa Gemini. El cliente de Gemini reintenta con espera creciente cuando responde 429 (cuota) o 503 (alta demanda), y prueba un modelo de respaldo si el configurado ya no existe (404). Los modelos se pueden ajustar con `ANTHROPIC_MODEL` y `GEMINI_MODEL`.
 
 Antes de registrar el primer usuario, conecta pgAdmin a PostgreSQL usando los datos External y ejecuta `schema.sql` en la base recién creada. No existen usuarios demo ni se necesita un archivo seed.
 
