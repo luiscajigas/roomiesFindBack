@@ -22,6 +22,7 @@
     <module>comun</module>
     <module>servicios/usuarios</module>
     <module>servicios/perfiles</module>
+    <module>servicios/compatibilidad</module>
   </modules>
 
   <properties>
