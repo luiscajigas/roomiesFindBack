@@ -60,6 +60,16 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada.' });
 });
 
+// Responde en JSON cualquier error no controlado de las rutas.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({ error: 'La solicitud no es válida.' });
+  }
+  console.error(err);
+  res.status(500).json({ error: 'Error interno del servidor.' });
+});
+
 async function iniciarServidor() {
   await prepararDirectorioFotos();
   // Crea las tablas si no existen; es seguro ejecutarlo en cada arranque.
