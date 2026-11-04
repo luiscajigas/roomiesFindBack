@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package roomiesfind.ia;
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.ia";
+
+// Redacta explicaciones en lenguaje natural. Es el único servicio que habla
+// con APIs de terceros, y lo hace por REST.
+service Ia {
+  rpc GenerarExplicacion(GenerarExplicacionRequest) returns (GenerarExplicacionResponse);
+}
+
+message GenerarExplicacionRequest {
+  string nombre_usuario = 1;
+  string nombre_candidato = 2;
+  int32 score = 3;
+  repeated string coincidencias = 4;
+  repeated string conflictos = 5;
+}
+
+message GenerarExplicacionResponse {
+  string texto = 1;
+}
