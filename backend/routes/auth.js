@@ -5,6 +5,7 @@ const pool = require('../db');
 const { SECRETO } = require('../middleware/auth');
 const { recibirFoto, esImagenReal } = require('../utils/upload');
 const { validarCuenta, validarPreferencias } = require('../utils/validacion');
+const { esBarrioValido } = require('../utils/barrios');
 
 const router = express.Router();
 
@@ -26,6 +27,9 @@ router.post('/registro', recibirFoto, async (req, res) => {
 
   if (!nombre || !email || !password || !presupuesto || !zona || !horario) {
     return res.status(400).json({ error: 'Faltan campos obligatorios del registro o del perfil.' });
+  }
+  if (!esBarrioValido(zona)) {
+    return res.status(400).json({ error: 'Elige un barrio de la lista.' });
   }
   const errorDatos = validarCuenta(req.body) || validarPreferencias(req.body);
   if (errorDatos) {
