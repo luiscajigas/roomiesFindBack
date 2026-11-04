@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { SECRETO } = require('../middleware/auth');
 const { recibirFoto, esImagenReal } = require('../utils/upload');
+const { validarCuenta, validarPreferencias } = require('../utils/validacion');
 
 const router = express.Router();
 
@@ -25,6 +26,10 @@ router.post('/registro', recibirFoto, async (req, res) => {
 
   if (!nombre || !email || !password || !presupuesto || !zona || !horario) {
     return res.status(400).json({ error: 'Faltan campos obligatorios del registro o del perfil.' });
+  }
+  const errorDatos = validarCuenta(req.body) || validarPreferencias(req.body);
+  if (errorDatos) {
+    return res.status(400).json({ error: errorDatos });
   }
   if (req.file) {
     try {
