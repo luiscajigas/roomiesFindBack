@@ -115,9 +115,11 @@ Caddy publica la API por HTTPS en ese dominio y obtiene el certificado automáti
 
 ## Estado del despliegue
 
-La carpeta `backend/` es el backend anterior en Node y **sigue siendo el que corre en producción**. Los microservicios están al lado y no lo afectan. `backend/` se puede borrar cuando producción use estos servicios.
+Los microservicios corren en una máquina virtual de Azure con Docker Compose, y la API se publica en `https://roomiesfind.eastus.cloudapp.azure.com/api`. La base de datos está en Neon y el frontend en Vercel.
 
-Los cinco procesos consumen unos 870 MB de memoria en total, y cada instancia gratuita de Render ofrece 512 MB. Además, los microservicios necesitan una red privada para hablarse por gRPC. Por eso hace falta un servidor con al menos 1 GB de memoria que ejecute Docker Compose. Las sesiones y contraseñas existentes siguen sirviendo con el mismo `JWT_SECRET` y la misma base.
+La carpeta `backend/` es el backend anterior en Node y se conserva como respaldo: para volver a él basta con apuntar el frontend a su URL de Render.
+
+Los cinco procesos consumen unos 870 MB de memoria, por lo que el servidor necesita al menos 1 GB libre para ellos.
 
 ## Si cambias la lista de barrios
 
