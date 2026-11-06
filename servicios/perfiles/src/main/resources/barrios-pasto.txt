@@ -1,4 +1,4 @@
-# Debe coincidir con frontend/src/app/data/barrios-pasto.ts
+# Debe coincidir con src/app/data/barrios-pasto.ts del repositorio del frontend
 Otro barrio de Pasto
 
 # Comuna 1

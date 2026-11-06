@@ -117,10 +117,8 @@ Caddy publica la API por HTTPS en ese dominio y obtiene el certificado automáti
 
 Los microservicios corren en una máquina virtual de Azure con Docker Compose, y la API se publica en `https://roomiesfind.eastus.cloudapp.azure.com/api`. La base de datos está en Neon y el frontend en Vercel.
 
-La carpeta `backend/` es el backend anterior en Node y se conserva como respaldo: para volver a él basta con apuntar el frontend a su URL de Render.
-
 Los cinco procesos consumen unos 870 MB de memoria, por lo que el servidor necesita al menos 1 GB libre para ellos.
 
 ## Si cambias la lista de barrios
 
-Está en dos archivos que deben coincidir: `frontend/src/app/data/barrios-pasto.ts` (repositorio del frontend) y `servicios/perfiles/src/main/resources/barrios-pasto.txt`.
+Está en dos archivos que deben coincidir: `src/app/data/barrios-pasto.ts` (repositorio del frontend) y `servicios/perfiles/src/main/resources/barrios-pasto.txt`.
