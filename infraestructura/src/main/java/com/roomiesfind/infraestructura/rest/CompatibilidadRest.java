@@ -56,6 +56,7 @@ public class CompatibilidadRest {
         .setScore(Json.tieneValor(datos, "score") ? Json.comoNumero(datos.get("score")) : Double.NaN)
         .addAllCoincidencias(coincidencias)
         .addAllConflictos(conflictos)
+        .setIdioma(datos.path("idioma").asText("es"))
         .build());
 
     Map<String, Object> respuesta = new LinkedHashMap<>();
