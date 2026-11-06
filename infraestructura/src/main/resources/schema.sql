@@ -81,6 +81,14 @@ CREATE TABLE IF NOT EXISTS explicaciones_ia (
 ALTER TABLE explicaciones_ia
   ADD COLUMN IF NOT EXISTS idioma VARCHAR(2) NOT NULL DEFAULT 'es';
 
+CREATE TABLE IF NOT EXISTS traducciones (
+  huella CHAR(64) NOT NULL,
+  idioma VARCHAR(2) NOT NULL,
+  traduccion TEXT NOT NULL,
+  creada_en TIMESTAMP NOT NULL DEFAULT now(),
+  PRIMARY KEY (huella, idioma)
+);
+
 CREATE INDEX IF NOT EXISTS idx_perfiles_zona ON perfiles(zona_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_usuario ON recomendaciones(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_candidato ON recomendaciones(candidato_id);
