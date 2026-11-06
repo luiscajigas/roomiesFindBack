@@ -40,7 +40,7 @@ public class WebConfig implements WebMvcConfigurer {
   }
 
   /** Además de los orígenes configurados, acepta las vistas previas de Vercel del mismo proyecto. */
-  static List<String> origenesPermitidos(String frontendUrl) {
+  public static List<String> origenesPermitidos(String frontendUrl) {
     List<String> origenes = new ArrayList<>(Arrays.stream(frontendUrl.split(","))
         .map(String::trim).filter((origen) -> !origen.isEmpty()).toList());
     origenes.stream()
