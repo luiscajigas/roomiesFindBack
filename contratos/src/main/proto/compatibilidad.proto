@@ -12,6 +12,8 @@ option java_package = "com.roomiesfind.contratos.compatibilidad";
 service Compatibilidad {
   rpc RegistrarRecomendacion(RegistrarRecomendacionRequest) returns (google.protobuf.Empty);
   rpc Explicar(ExplicarRequest) returns (ExplicarResponse);
+  // Traduce un texto una sola vez; después responde con la traducción guardada.
+  rpc Traducir(TraducirRequest) returns (TraducirResponse);
 }
 
 message RegistrarRecomendacionRequest {
@@ -28,6 +30,15 @@ message ExplicarRequest {
   repeated string conflictos = 5;
   // "es" o "en". Si no llega, español.
   string idioma = 6;
+}
+
+message TraducirRequest {
+  string texto = 1;
+  string idioma = 2;
+}
+
+message TraducirResponse {
+  string texto = 1;
 }
 
 message ExplicarResponse {

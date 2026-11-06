@@ -9,6 +9,7 @@ option java_package = "com.roomiesfind.contratos.ia";
 // con APIs de terceros, y lo hace por REST.
 service Ia {
   rpc GenerarExplicacion(GenerarExplicacionRequest) returns (GenerarExplicacionResponse);
+  rpc TraducirTexto(TraducirTextoRequest) returns (TraducirTextoResponse);
 }
 
 message GenerarExplicacionRequest {
@@ -22,5 +23,14 @@ message GenerarExplicacionRequest {
 }
 
 message GenerarExplicacionResponse {
+  string texto = 1;
+}
+
+message TraducirTextoRequest {
+  string texto = 1;
+  string idioma = 2;
+}
+
+message TraducirTextoResponse {
   string texto = 1;
 }
