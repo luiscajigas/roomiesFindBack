@@ -46,6 +46,7 @@ public class CompatibilidadService {
     int usuarioId = solicitud.usuarioId();
     int candidatoId = (int) solicitud.candidatoId();
     int score = (int) solicitud.score();
+    String idioma = "en".equals(solicitud.idioma()) ? "en" : "es";
 
     try {
       Map<Integer, String> nombres = usuarios.nombres(List.of(usuarioId, candidatoId));
@@ -53,16 +54,16 @@ public class CompatibilidadService {
         throw ErrorNegocio.noEncontrado("El perfil del candidato no existe.");
       }
 
-      // Para no repetir llamadas a la IA, se reutiliza lo ya generado para esta pareja y puntaje.
-      Optional<Explicacion> guardada = explicaciones.buscarGenerada(usuarioId, candidatoId, score);
+      // Para no repetir llamadas a la IA, se reutiliza lo ya generado para esta pareja, puntaje e idioma.
+      Optional<Explicacion> guardada = explicaciones.buscarGenerada(usuarioId, candidatoId, score, idioma);
       if (guardada.isPresent()) {
         return new ExplicacionDto(guardada.get().id(), ESTADO_GENERADO, guardada.get().texto(), score, true);
       }
 
-      int id = explicaciones.crearPendiente(usuarioId, candidatoId, score);
+      int id = explicaciones.crearPendiente(usuarioId, candidatoId, score, idioma);
       String texto = ia.generar(
           nombres.getOrDefault(usuarioId, "la persona usuaria"), nombres.get(candidatoId), score,
-          solicitud.coincidencias(), solicitud.conflictos());
+          solicitud.coincidencias(), solicitud.conflictos(), idioma);
       explicaciones.marcarGenerada(id, texto);
       return new ExplicacionDto(id, ESTADO_GENERADO, texto, score, false);
     } catch (ErrorNegocio error) {

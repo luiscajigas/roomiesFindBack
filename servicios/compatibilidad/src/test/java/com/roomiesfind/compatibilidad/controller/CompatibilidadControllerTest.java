@@ -43,6 +43,6 @@ class CompatibilidadControllerTest {
   void noExplicaLaCompatibilidadConsigoMismo() {
     assertEquals("No puedes pedir una explicación de compatibilidad contigo mismo.",
         assertThrows(ErrorNegocio.class, () -> controller.explicar(
-            new SolicitudExplicacionDto(1, 1, 50, List.of(), List.of()))).getMessage());
+            new SolicitudExplicacionDto(1, 1, 50, List.of(), List.of(), "es"))).getMessage());
   }
 }

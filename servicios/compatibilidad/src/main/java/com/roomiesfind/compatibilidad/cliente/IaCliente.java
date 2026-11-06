@@ -20,7 +20,7 @@ public class IaCliente {
   }
 
   public String generar(String nombreUsuario, String nombreCandidato, int score,
-      List<String> coincidencias, List<String> conflictos) {
+      List<String> coincidencias, List<String> conflictos, String idioma) {
     return ia.withDeadlineAfter(ESPERA_MAXIMA_SEGUNDOS, TimeUnit.SECONDS)
         .generarExplicacion(GenerarExplicacionRequest.newBuilder()
             .setNombreUsuario(nombreUsuario)
@@ -28,6 +28,7 @@ public class IaCliente {
             .setScore(score)
             .addAllCoincidencias(coincidencias)
             .addAllConflictos(conflictos)
+            .setIdioma(idioma)
             .build())
         .getTexto();
   }

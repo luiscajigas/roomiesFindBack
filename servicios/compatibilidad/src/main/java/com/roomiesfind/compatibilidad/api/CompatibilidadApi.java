@@ -41,7 +41,7 @@ public class CompatibilidadApi extends CompatibilidadGrpc.CompatibilidadImplBase
     RespuestaGrpc.responder(observador, () -> {
       ExplicacionDto explicacion = controller.explicar(new SolicitudExplicacionDto(
           request.getUsuarioId(), request.getCandidatoId(), request.getScore(),
-          request.getCoincidenciasList(), request.getConflictosList()));
+          request.getCoincidenciasList(), request.getConflictosList(), request.getIdioma()));
       return ExplicarResponse.newBuilder()
           .setId(explicacion.id())
           .setEstado(explicacion.estado())
