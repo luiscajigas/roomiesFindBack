@@ -89,6 +89,29 @@ CREATE TABLE IF NOT EXISTS traducciones (
   PRIMARY KEY (huella, idioma)
 );
 
+-- Chat: cada pareja tiene una sola conversación, con el id menor primero.
+CREATE TABLE IF NOT EXISTS conversaciones (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  usuario_a INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  usuario_b INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  creada_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (usuario_a, usuario_b),
+  CHECK (usuario_a < usuario_b)
+);
+
+CREATE TABLE IF NOT EXISTS mensajes (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  conversacion_id BIGINT NOT NULL REFERENCES conversaciones(id) ON DELETE CASCADE,
+  remitente_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  contenido TEXT NOT NULL CHECK (char_length(contenido) BETWEEN 1 AND 2000),
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  leido_en TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversaciones_b ON conversaciones(usuario_b);
+CREATE INDEX IF NOT EXISTS idx_mensajes_conversacion ON mensajes(conversacion_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_mensajes_sin_leer ON mensajes(conversacion_id, remitente_id) WHERE leido_en IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_perfiles_zona ON perfiles(zona_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_usuario ON recomendaciones(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_candidato ON recomendaciones(candidato_id);
