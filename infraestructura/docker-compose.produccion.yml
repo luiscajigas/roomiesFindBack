@@ -25,6 +25,15 @@ services:
     restart: unless-stopped
     depends_on: !reset {}
 
+  redis:
+    restart: unless-stopped
+
+  chat:
+    restart: unless-stopped
+    depends_on: !reset
+      redis:
+        condition: service_healthy
+
   orquestador:
     restart: unless-stopped
     ports: !reset []

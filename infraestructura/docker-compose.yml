@@ -30,6 +30,16 @@ services:
       timeout: 3s
       retries: 20
 
+  # Solo lo usa el microservicio de chat. No guarda nada: los mensajes están en PostgreSQL.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   usuarios:
     build:
       <<: *construccion
@@ -83,6 +93,20 @@ services:
       ia:
         condition: service_started
 
+  chat:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/chat
+    environment:
+      <<: *entorno
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   orquestador:
     build:
       <<: *construccion
@@ -94,6 +118,7 @@ services:
       GRPC_USUARIOS: usuarios:9091
       GRPC_PERFILES: perfiles:9092
       GRPC_COMPATIBILIDAD: compatibilidad:9093
+      GRPC_CHAT: chat:9095
     ports:
       - "3001:3001"
     depends_on:
@@ -104,6 +129,8 @@ services:
       perfiles:
         condition: service_started
       compatibilidad:
+        condition: service_started
+      chat:
         condition: service_started
 
 volumes:
