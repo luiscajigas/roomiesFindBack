@@ -39,6 +39,10 @@ public class PerfilController {
     return perfiles.obtener(usuarioId);
   }
 
+  public List<PerfilDto> obtenerVarios(List<Integer> usuarioIds) {
+    return perfiles.obtenerVarios(usuarioIds);
+  }
+
   public PerfilDto actualizar(int usuarioId, DatosPerfilDto datos) {
     if (datos.fotoUrl() != null && !datos.fotoUrl().isEmpty() && !ReglasPerfil.esUrlImagenValida(datos.fotoUrl())) {
       throw ErrorNegocio.solicitudInvalida("El enlace de la foto debe ser una URL válida que use HTTP o HTTPS.");

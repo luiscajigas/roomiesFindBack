@@ -55,6 +55,10 @@ public class PerfilService {
         .orElseThrow(() -> ErrorNegocio.noEncontrado(PERFIL_NO_ENCONTRADO));
   }
 
+  public List<PerfilDto> obtenerVarios(List<Integer> usuarioIds) {
+    return perfiles.buscarVarios(usuarioIds).stream().map(PerfilService::aDto).toList();
+  }
+
   public String zonaActual(int usuarioId) {
     return perfiles.buscar(usuarioId).map(Perfil::zona).orElse(null);
   }

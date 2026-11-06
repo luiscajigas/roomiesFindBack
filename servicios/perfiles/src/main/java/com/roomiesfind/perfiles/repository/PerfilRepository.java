@@ -1,6 +1,7 @@
 package com.roomiesfind.perfiles.repository;
 
 import com.roomiesfind.perfiles.model.Perfil;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,12 @@ public class PerfilRepository {
 
   public Optional<Perfil> buscar(int usuarioId) {
     return jdbc.query(SELECT_PERFIL + "WHERE p.usuario_id = ?", FILA, usuarioId).stream().findFirst();
+  }
+
+  public List<Perfil> buscarVarios(List<Integer> usuarioIds) {
+    if (usuarioIds.isEmpty()) return List.of();
+    String marcadores = String.join(", ", Collections.nCopies(usuarioIds.size(), "?"));
+    return jdbc.query(SELECT_PERFIL + "WHERE p.usuario_id IN (" + marcadores + ")", FILA, usuarioIds.toArray());
   }
 
   public List<Perfil> listarExcepto(int usuarioId) {
