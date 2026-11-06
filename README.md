@@ -8,7 +8,8 @@ Backend de RoomiesFind en un monorepositorio Maven (Java 21, Spring Boot). Cada 
 |---|---|---|
 | **Entre módulos** (microservicios y orquestador) | **gRPC sobre HTTP/2** | `contratos/src/main/proto`, archivos `*Api.java` |
 | **Con APIs de terceros** (Claude, Gemini) | **API REST** | `servicios/ia/.../cliente/rest` |
-| Navegador con el orquestador | REST/JSON | `infraestructura/.../rest` |
+| Navegador con el orquestador | REST/JSON y WebSocket | `infraestructura/.../rest`, `infraestructura/.../chat` |
+| Eventos del chat entre instancias | Redis pub/sub | Solo dentro de `servicios/chat` |
 
 Ningún microservicio expone HTTP y ningún módulo llama a otro por REST. El único código que usa un cliente REST está en `servicios/ia/.../cliente/rest`.
 
@@ -42,6 +43,7 @@ Ningún microservicio expone HTTP y ningún módulo llama a otro por REST. El ú
 | `servicios/perfiles` | Preferencias, barrios y fotos | `perfiles`, `zonas`, `fotos_perfil` | 9092 |
 | `servicios/compatibilidad` | Historial de puntajes y explicaciones guardadas | `recomendaciones`, `explicaciones_ia` | 9093 |
 | `servicios/ia` | Redacta explicaciones con Claude y Gemini de respaldo | | 9094 |
+| `servicios/chat` | Conversaciones y mensajes en tiempo real, con Redis | `conversaciones`, `mensajes` | 9095 |
 | `infraestructura` | Orquestador: puerta de entrada, registro, tablas y Docker | crea el esquema | HTTP 3001 |
 
 Cada servicio solo consulta sus propias tablas. Si necesita datos de otro, los pide por gRPC.
@@ -72,6 +74,21 @@ Crear una cuenta toca dos servicios, así que ya no cabe en una sola transacció
 3. Pide a `perfiles` que cree el perfil. Si falla, pide a `usuarios` que elimine la cuenta.
 
 También une los datos de `perfiles` y `usuarios` en una sola respuesta, valida las sesiones con `usuarios` y crea las tablas que falten al arrancar (`schema.sql`).
+
+## Chat en tiempo real
+
+```text
+Navegador ⇄ WebSocket ⇄ orquestador ──gRPC──▶ servicios/chat ──▶ PostgreSQL
+                             ▲                     │    ▲
+                             └── gRPC streaming ◀──┘    └─ Redis pub/sub
+```
+
+1. El navegador abre `/ws/chat` y envía su token como primer mensaje, no en la URL.
+2. El orquestador valida el token y abre un stream gRPC con `servicios/chat`.
+3. Al enviar un mensaje, `servicios/chat` lo guarda en PostgreSQL y publica el evento en Redis.
+4. Cada instancia del servicio recibe de Redis los eventos y los entrega a sus streams abiertos. Así el chat funciona igual con varias copias del servicio.
+
+El orquestador no conoce Redis: solo habla con `servicios/chat` por gRPC. Si Redis se cae, los mensajes siguen guardándose y solo se pierde el aviso en vivo hasta que vuelva.
 
 ## Ejecutar
 
@@ -117,7 +134,7 @@ Caddy publica la API por HTTPS en ese dominio y obtiene el certificado automáti
 
 Los microservicios corren en una máquina virtual de Azure con Docker Compose, y la API se publica en `https://roomiesfind.eastus.cloudapp.azure.com/api`. La base de datos está en Neon y el frontend en Vercel.
 
-Los cinco procesos consumen unos 870 MB de memoria, por lo que el servidor necesita al menos 1 GB libre para ellos.
+Los procesos Java consumen unos 170 MB de memoria cada uno, y Redis muy poco. El servidor necesita al menos 2 GB de memoria.
 
 ## Si cambias la lista de barrios
 
