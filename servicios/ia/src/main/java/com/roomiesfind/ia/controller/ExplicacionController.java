@@ -17,4 +17,8 @@ public class ExplicacionController {
   public String generar(SolicitudTextoDto solicitud) {
     return servicio.generar(solicitud);
   }
+
+  public String traducir(String texto, String idioma) {
+    return servicio.traducir(texto, idioma);
+  }
 }

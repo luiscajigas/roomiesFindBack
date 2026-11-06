@@ -4,6 +4,8 @@ import com.roomiesfind.comun.RespuestaGrpc;
 import com.roomiesfind.contratos.ia.GenerarExplicacionRequest;
 import com.roomiesfind.contratos.ia.GenerarExplicacionResponse;
 import com.roomiesfind.contratos.ia.IaGrpc;
+import com.roomiesfind.contratos.ia.TraducirTextoRequest;
+import com.roomiesfind.contratos.ia.TraducirTextoResponse;
 import com.roomiesfind.ia.controller.ExplicacionController;
 import com.roomiesfind.ia.dto.SolicitudTextoDto;
 import io.grpc.stub.StreamObserver;
@@ -28,6 +30,13 @@ public class IaApi extends IaGrpc.IaImplBase {
         .setTexto(controller.generar(new SolicitudTextoDto(
             request.getNombreUsuario(), request.getNombreCandidato(), request.getScore(),
             request.getCoincidenciasList(), request.getConflictosList(), request.getIdioma())))
+        .build());
+  }
+
+  @Override
+  public void traducirTexto(TraducirTextoRequest request, StreamObserver<TraducirTextoResponse> observador) {
+    RespuestaGrpc.responder(observador, () -> TraducirTextoResponse.newBuilder()
+        .setTexto(controller.traducir(request.getTexto(), request.getIdioma()))
         .build());
   }
 }

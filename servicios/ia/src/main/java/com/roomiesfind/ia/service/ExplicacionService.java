@@ -8,7 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/** Prueba los proveedores configurados en orden: Claude y luego Gemini de respaldo. */
+/** Redacta con el primer proveedor disponible, en orden: Claude y luego Gemini de respaldo. */
 @Service
 public class ExplicacionService {
 
@@ -21,13 +21,20 @@ public class ExplicacionService {
   }
 
   public String generar(SolicitudTextoDto solicitud) {
-    String prompt = PromptExplicacion.construir(solicitud);
+    return RecorteTexto.hastaUltimaOracionCompleta(conPrimerProveedor(PromptExplicacion.construir(solicitud)));
+  }
+
+  public String traducir(String texto, String idioma) {
+    return conPrimerProveedor(PromptTraduccion.construir(texto, idioma));
+  }
+
+  private String conPrimerProveedor(String prompt) {
     RuntimeException ultimoError = null;
 
     for (ProveedorIa proveedor : proveedores) {
       if (!proveedor.estaConfigurado()) continue;
       try {
-        return RecorteTexto.hastaUltimaOracionCompleta(proveedor.generar(prompt));
+        return proveedor.generar(prompt);
       } catch (RuntimeException error) {
         ultimoError = error;
         log.warn("Falló la IA con {}: {}", proveedor.nombre(), error.getMessage());
