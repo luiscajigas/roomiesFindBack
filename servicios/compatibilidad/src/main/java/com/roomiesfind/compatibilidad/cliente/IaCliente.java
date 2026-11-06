@@ -2,6 +2,7 @@ package com.roomiesfind.compatibilidad.cliente;
 
 import com.roomiesfind.contratos.ia.GenerarExplicacionRequest;
 import com.roomiesfind.contratos.ia.IaGrpc;
+import com.roomiesfind.contratos.ia.TraducirTextoRequest;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,12 @@ public class IaCliente {
             .addAllConflictos(conflictos)
             .setIdioma(idioma)
             .build())
+        .getTexto();
+  }
+
+  public String traducir(String texto, String idioma) {
+    return ia.withDeadlineAfter(ESPERA_MAXIMA_SEGUNDOS, TimeUnit.SECONDS)
+        .traducirTexto(TraducirTextoRequest.newBuilder().setTexto(texto).setIdioma(idioma).build())
         .getTexto();
   }
 }

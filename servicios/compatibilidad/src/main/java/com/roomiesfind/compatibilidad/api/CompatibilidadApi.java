@@ -9,6 +9,8 @@ import com.roomiesfind.contratos.compatibilidad.CompatibilidadGrpc;
 import com.roomiesfind.contratos.compatibilidad.ExplicarRequest;
 import com.roomiesfind.contratos.compatibilidad.ExplicarResponse;
 import com.roomiesfind.contratos.compatibilidad.RegistrarRecomendacionRequest;
+import com.roomiesfind.contratos.compatibilidad.TraducirRequest;
+import com.roomiesfind.contratos.compatibilidad.TraducirResponse;
 import io.grpc.stub.StreamObserver;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +36,13 @@ public class CompatibilidadApi extends CompatibilidadGrpc.CompatibilidadImplBase
           request.hasScore() ? request.getScore() : null);
       return Empty.getDefaultInstance();
     });
+  }
+
+  @Override
+  public void traducir(TraducirRequest request, StreamObserver<TraducirResponse> observador) {
+    RespuestaGrpc.responder(observador, () -> TraducirResponse.newBuilder()
+        .setTexto(controller.traducir(request.getTexto(), request.getIdioma()))
+        .build());
   }
 
   @Override

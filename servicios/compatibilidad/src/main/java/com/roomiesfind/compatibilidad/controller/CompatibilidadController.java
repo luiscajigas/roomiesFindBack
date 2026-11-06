@@ -4,16 +4,21 @@ import com.roomiesfind.comun.ErrorNegocio;
 import com.roomiesfind.compatibilidad.dto.ExplicacionDto;
 import com.roomiesfind.compatibilidad.dto.SolicitudExplicacionDto;
 import com.roomiesfind.compatibilidad.service.CompatibilidadService;
+import com.roomiesfind.compatibilidad.service.TraduccionService;
 import org.springframework.stereotype.Component;
 
 /** Valida la entrada y coordina los casos de uso. No conoce gRPC ni SQL. */
 @Component
 public class CompatibilidadController {
 
-  private final CompatibilidadService servicio;
+  private static final int LARGO_MAXIMO_TEXTO = 1000;
 
-  public CompatibilidadController(CompatibilidadService servicio) {
+  private final CompatibilidadService servicio;
+  private final TraduccionService traducciones;
+
+  public CompatibilidadController(CompatibilidadService servicio, TraduccionService traducciones) {
     this.servicio = servicio;
+    this.traducciones = traducciones;
   }
 
   public void registrar(int usuarioId, Double candidatoId, Double score) {
@@ -34,6 +39,16 @@ public class CompatibilidadController {
       throw ErrorNegocio.solicitudInvalida("No puedes pedir una explicación de compatibilidad contigo mismo.");
     }
     return servicio.explicar(solicitud);
+  }
+
+  public String traducir(String texto, String idioma) {
+    if (!"en".equals(idioma) && !"es".equals(idioma)) {
+      throw ErrorNegocio.solicitudInvalida("El idioma no es válido.");
+    }
+    if (texto.isBlank() || texto.length() > LARGO_MAXIMO_TEXTO) {
+      throw ErrorNegocio.solicitudInvalida("El texto no se puede traducir.");
+    }
+    return traducciones.traducir(texto, idioma);
   }
 
   static boolean esIdValido(double id) {

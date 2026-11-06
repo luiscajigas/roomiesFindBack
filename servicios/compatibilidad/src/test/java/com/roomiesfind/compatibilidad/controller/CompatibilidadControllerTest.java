@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class CompatibilidadControllerTest {
 
-  private final CompatibilidadController controller = new CompatibilidadController(null);
+  private final CompatibilidadController controller = new CompatibilidadController(null, null);
 
   @Test
   void validaIdentificadoresYPuntajes() {
@@ -37,6 +37,16 @@ class CompatibilidadControllerTest {
         assertThrows(ErrorNegocio.class, () -> controller.registrar(1, 2.0, null)).getMessage());
     assertEquals("candidatoId o score no son válidos.",
         assertThrows(ErrorNegocio.class, () -> controller.registrar(1, 1.0, 50.0)).getMessage());
+  }
+
+  @Test
+  void validaIdiomaYLargoAlTraducir() {
+    assertEquals("El idioma no es válido.",
+        assertThrows(ErrorNegocio.class, () -> controller.traducir("Hola", "fr")).getMessage());
+    assertEquals("El texto no se puede traducir.",
+        assertThrows(ErrorNegocio.class, () -> controller.traducir("x".repeat(1001), "en")).getMessage());
+    assertEquals("El texto no se puede traducir.",
+        assertThrows(ErrorNegocio.class, () -> controller.traducir("   ", "en")).getMessage());
   }
 
   @Test
