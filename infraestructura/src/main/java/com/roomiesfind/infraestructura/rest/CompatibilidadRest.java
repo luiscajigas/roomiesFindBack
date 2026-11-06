@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.roomiesfind.contratos.compatibilidad.ExplicarRequest;
 import com.roomiesfind.contratos.compatibilidad.ExplicarResponse;
 import com.roomiesfind.contratos.compatibilidad.RegistrarRecomendacionRequest;
+import com.roomiesfind.contratos.compatibilidad.TraducirRequest;
+import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
+import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
@@ -40,6 +43,29 @@ public class CompatibilidadRest {
     if (Json.tieneValor(datos, "score")) peticion.setScore(Json.comoNumero(datos.get("score")));
     clientes.compatibilidad().registrarRecomendacion(peticion.build());
     return Map.of("registrado", true);
+  }
+
+  /**
+   * Traduce la descripción de una persona. Recibe a quién y no el texto:
+   * así la ruta solo traduce perfiles reales y no sirve de traductor gratuito.
+   */
+  @RequiereAuth
+  @PostMapping("/traducir-descripcion")
+  Map<String, String> traducirDescripcion(@RequestBody(required = false) JsonNode cuerpo) {
+    JsonNode datos = Json.objetoOVacio(cuerpo);
+    double id = Json.tieneValor(datos, "usuarioId") ? Json.comoNumero(datos.get("usuarioId")) : Double.NaN;
+    if (!(id > 0 && id <= Integer.MAX_VALUE && id == Math.rint(id))) {
+      throw new ErrorRest(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
+    }
+    Perfil perfil = clientes.perfiles().obtenerPerfil(ObtenerPerfilRequest.newBuilder().setUsuarioId((int) id).build());
+    if (!perfil.hasDescripcion() || perfil.getDescripcion().isBlank()) {
+      throw new ErrorRest(HttpStatus.NOT_FOUND, "Perfil no encontrado.");
+    }
+    String traduccion = clientes.compatibilidad().traducir(TraducirRequest.newBuilder()
+        .setTexto(perfil.getDescripcion())
+        .setIdioma(datos.path("idioma").asText(""))
+        .build()).getTexto();
+    return Map.of("descripcion", traduccion);
   }
 
   @RequiereAuth
