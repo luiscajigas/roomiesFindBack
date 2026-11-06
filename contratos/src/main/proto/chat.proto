@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package roomiesfind.chat;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.chat";
+
+// Conversaciones entre dos personas. Es el único servicio que usa Redis.
+service Chat {
+  rpc ListarConversaciones(ListarConversacionesRequest) returns (ListarConversacionesResponse);
+  rpc ObtenerMensajes(ObtenerMensajesRequest) returns (ObtenerMensajesResponse);
+  rpc EnviarMensaje(EnviarMensajeRequest) returns (Mensaje);
+  rpc MarcarLeidos(MarcarLeidosRequest) returns (google.protobuf.Empty);
+  rpc NotificarEscribiendo(NotificarEscribiendoRequest) returns (google.protobuf.Empty);
+  // Stream abierto mientras la persona está conectada: entrega sus eventos en vivo.
+  rpc EscucharEventos(EscucharEventosRequest) returns (stream EventoChat);
+}
+
+message Mensaje {
+  int64 id = 1;
+  int32 remitente_id = 2;
+  int32 destinatario_id = 3;
+  string contenido = 4;
+  string creado_en = 5;
+  optional string leido_en = 6;
+}
+
+message Conversacion {
+  int32 otro_id = 1;
+  Mensaje ultimo_mensaje = 2;
+  int32 no_leidos = 3;
+}
+
+message ListarConversacionesRequest {
+  int32 usuario_id = 1;
+}
+
+message ListarConversacionesResponse {
+  repeated Conversacion conversaciones = 1;
+}
+
+message ObtenerMensajesRequest {
+  int32 usuario_id = 1;
+  int32 otro_id = 2;
+  // Devuelve los mensajes anteriores a este id; si no llega, los más recientes.
+  optional int64 antes_de = 3;
+  int32 limite = 4;
+}
+
+message ObtenerMensajesResponse {
+  repeated Mensaje mensajes = 1;
+  bool hay_mas = 2;
+}
+
+message EnviarMensajeRequest {
+  int32 remitente_id = 1;
+  int32 destinatario_id = 2;
+  string contenido = 3;
+}
+
+message MarcarLeidosRequest {
+  int32 usuario_id = 1;
+  int32 otro_id = 2;
+}
+
+message NotificarEscribiendoRequest {
+  int32 usuario_id = 1;
+  int32 destinatario_id = 2;
+}
+
+message EscucharEventosRequest {
+  int32 usuario_id = 1;
+}
+
+message EventoChat {
+  oneof evento {
+    Mensaje mensaje = 1;
+    MensajesLeidos leidos = 2;
+    PersonaEscribiendo escribiendo = 3;
+  }
+}
+
+message MensajesLeidos {
+  int32 lector_id = 1;
+  int32 remitente_id = 2;
+  string leido_en = 3;
+}
+
+message PersonaEscribiendo {
+  int32 usuario_id = 1;
+}
