@@ -43,7 +43,7 @@ public class PerfilesRest {
   @GetMapping("/{usuarioId}/foto")
   ResponseEntity<byte[]> foto(@PathVariable String usuarioId) {
     Foto foto = clientes.perfiles().obtenerFoto(
-        ObtenerFotoRequest.newBuilder().setUsuarioId(leerIdFoto(usuarioId)).build());
+        ObtenerFotoRequest.newBuilder().setUsuarioId(leerId(usuarioId)).build());
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(foto.getTipoMime()))
         .header(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -84,11 +84,18 @@ public class PerfilesRest {
     return consulta.candidatos(usuarioId);
   }
 
-  private static int leerIdFoto(String texto) {
+  @RequiereAuth
+  @GetMapping("/{usuarioId}")
+  Map<String, Object> persona(@PathVariable String usuarioId) {
+    return consulta.personas(List.of(leerId(usuarioId))).stream().findFirst()
+        .orElseThrow(() -> new ErrorRest(HttpStatus.NOT_FOUND, "Perfil no encontrado."));
+  }
+
+  private static int leerId(String texto) {
     try {
       BigDecimal id = new BigDecimal(texto);
       if (id.signum() > 0 && id.stripTrailingZeros().scale() <= 0) {
-        // Un número válido pero enorme simplemente no tiene foto.
+        // Un número válido pero enorme simplemente no existe.
         return id.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0 ? Integer.MAX_VALUE : id.intValueExact();
       }
     } catch (NumberFormatException error) {

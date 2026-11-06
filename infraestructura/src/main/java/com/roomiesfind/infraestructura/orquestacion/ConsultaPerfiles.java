@@ -2,6 +2,7 @@ package com.roomiesfind.infraestructura.orquestacion;
 
 import com.roomiesfind.contratos.perfiles.ListarCandidatosRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
+import com.roomiesfind.contratos.perfiles.ObtenerPerfilesRequest;
 import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.contratos.usuarios.ObtenerUsuariosRequest;
 import com.roomiesfind.contratos.usuarios.Usuario;
@@ -42,6 +43,18 @@ public class ConsultaPerfiles {
     List<Perfil> perfiles = clientes.perfiles()
         .listarCandidatos(ListarCandidatosRequest.newBuilder().setExcluirUsuarioId(usuarioId).build())
         .getPerfilesList();
+    return conNombre(perfiles);
+  }
+
+  /** Solo las personas pedidas, para no traer a todos los usuarios cuando no hace falta. */
+  public List<Map<String, Object>> personas(List<Integer> ids) {
+    if (ids.isEmpty()) return List.of();
+    return conNombre(clientes.perfiles()
+        .obtenerPerfiles(ObtenerPerfilesRequest.newBuilder().addAllUsuarioIds(ids).build())
+        .getPerfilesList());
+  }
+
+  private List<Map<String, Object>> conNombre(List<Perfil> perfiles) {
     Map<Integer, Usuario> usuarios = usuarios(perfiles.stream().map(Perfil::getUsuarioId).toList());
 
     return perfiles.stream()
