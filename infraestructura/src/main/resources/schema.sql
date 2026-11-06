@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS explicaciones_ia (
   creado_en TIMESTAMP NOT NULL DEFAULT now()
 );
 
+ALTER TABLE explicaciones_ia
+  ADD COLUMN IF NOT EXISTS idioma VARCHAR(2) NOT NULL DEFAULT 'es';
+
 CREATE INDEX IF NOT EXISTS idx_perfiles_zona ON perfiles(zona_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_usuario ON recomendaciones(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_candidato ON recomendaciones(candidato_id);
