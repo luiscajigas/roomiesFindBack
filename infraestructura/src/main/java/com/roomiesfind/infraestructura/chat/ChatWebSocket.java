@@ -139,7 +139,9 @@ public class ChatWebSocket extends TextWebSocketHandler {
 
           @Override
           public void onError(Throwable error) {
-            if (Status.fromThrowable(error).getCode() != Status.Code.CANCELLED) {
+            // No basta con ignorar CANCELLED: es lo que llega también cuando el servicio se apaga.
+            // Si el WebSocket ya estaba cerrado, cerrar no hace nada.
+            if (conexion.sesion.isOpen()) {
               log.warn("Se cortó el stream de chat: {}", Status.fromThrowable(error).getCode());
               cerrar(conexion, CloseStatus.SERVICE_RESTARTED);
             }
