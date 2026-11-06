@@ -96,6 +96,17 @@ Sin Docker necesitas Java 21 y un PostgreSQL. Compila con `./mvnw package` y arr
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | ia | API REST de Gemini (respaldo) |
 | `GRPC_USUARIOS`, `GRPC_PERFILES`, `GRPC_COMPATIBILIDAD`, `GRPC_IA` | clientes | Direcciones `host:puerto`; por defecto `localhost` |
 
+## Desplegar en un servidor
+
+En un servidor con Docker, con DATABASE_URL externa y DOMINIO definidos en `.env`:
+
+```bash
+cd infraestructura
+docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.produccion.yml up -d --build
+```
+
+Caddy publica la API por HTTPS en ese dominio y obtiene el certificado automáticamente. Solo se exponen los puertos 80 y 443.
+
 ## Pruebas
 
 ```bash

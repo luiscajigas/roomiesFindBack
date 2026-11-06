@@ -1,0 +1,3 @@
+{$DOMINIO} {
+	reverse_proxy orquestador:3001
+}

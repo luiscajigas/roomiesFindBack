@@ -1,0 +1,48 @@
+# Ajustes para el servidor público. Se usa junto con docker-compose.yml:
+#   docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.produccion.yml up -d
+#
+# - Caddy recibe el tráfico por HTTPS y obtiene el certificado automáticamente.
+# - El orquestador deja de publicar su puerto: solo se llega a él a través de Caddy.
+# - La base de datos es externa (DATABASE_URL), así que no se levanta el Postgres local.
+# - Los servicios vuelven a arrancar solos si el servidor se reinicia.
+
+services:
+  postgres:
+    profiles: ["local"]
+
+  usuarios:
+    restart: unless-stopped
+    depends_on: !reset {}
+
+  perfiles:
+    restart: unless-stopped
+    depends_on: !reset {}
+
+  ia:
+    restart: unless-stopped
+
+  compatibilidad:
+    restart: unless-stopped
+    depends_on: !reset {}
+
+  orquestador:
+    restart: unless-stopped
+    ports: !reset []
+    depends_on: !reset {}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMINIO: ${DOMINIO:?Define DOMINIO en el archivo .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - datos-caddy:/data
+    depends_on:
+      - orquestador
+
+volumes:
+  datos-caddy:
