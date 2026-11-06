@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 class ExplicacionServiceTest {
 
   private static final SolicitudTextoDto SOLICITUD =
-      new SolicitudTextoDto("Ana", "Beto", 80, List.of("Horarios"), List.of());
+      new SolicitudTextoDto("Ana", "Beto", 80, List.of("Horarios"), List.of(), "es");
 
   private record Falso(String nombre, boolean configurado, String texto, List<String> llamados) implements ProveedorIa {
     @Override public boolean estaConfigurado() { return configurado; }
@@ -65,6 +65,17 @@ class ExplicacionServiceTest {
     assertTrue(prompt.contains("Ana y Beto tienen un 80% de compatibilidad"));
     assertTrue(prompt.contains("- Horarios"));
     assertTrue(prompt.contains("- (sin datos registrados)"));
+  }
+
+  @Test
+  void escribeElPromptEnElIdiomaPedido() {
+    String ingles = PromptExplicacion.construir(new SolicitudTextoDto("Ana", "Beto", 80, List.of("Horarios"), List.of(), "en"));
+    assertTrue(ingles.contains("Explain in English"));
+    assertTrue(ingles.contains("Ana and Beto have a 80% compatibility"));
+    assertFalse(ingles.contains("Explica en español"));
+
+    String sinIdioma = PromptExplicacion.construir(new SolicitudTextoDto("Ana", "Beto", 80, List.of(), List.of(), ""));
+    assertTrue(sinIdioma.contains("Explica en español"));
   }
 
   @Test

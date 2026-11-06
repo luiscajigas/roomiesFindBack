@@ -27,7 +27,7 @@ public class IaApi extends IaGrpc.IaImplBase {
     RespuestaGrpc.responder(observador, () -> GenerarExplicacionResponse.newBuilder()
         .setTexto(controller.generar(new SolicitudTextoDto(
             request.getNombreUsuario(), request.getNombreCandidato(), request.getScore(),
-            request.getCoincidenciasList(), request.getConflictosList())))
+            request.getCoincidenciasList(), request.getConflictosList(), request.getIdioma())))
         .build());
   }
 }

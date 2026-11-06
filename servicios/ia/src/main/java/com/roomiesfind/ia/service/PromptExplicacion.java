@@ -12,6 +12,33 @@ final class PromptExplicacion {
   private PromptExplicacion() {}
 
   static String construir(SolicitudTextoDto solicitud) {
+    return "en".equals(solicitud.idioma()) ? enIngles(solicitud) : enEspanol(solicitud);
+  }
+
+  private static String enIngles(SolicitudTextoDto solicitud) {
+    String usuario = solicitud.nombreUsuario();
+    String candidato = solicitud.nombreCandidato();
+    return String.join("\n",
+        "You are the assistant of RoomiesFind, an app for finding roommates.",
+        "Explain in English, addressed to " + usuario + ", why " + usuario + " and " + candidato
+            + " have a " + solicitud.score() + "% compatibility.",
+        "The score was already calculated with objective rules; your only job is to interpret it, not change it.",
+        "The lists below are in Spanish: translate them as you use them.",
+        "",
+        "Things in common:",
+        comoLista(solicitud.coincidencias()),
+        "",
+        "Possible topics to discuss before living together:",
+        comoLista(solicitud.conflictos()),
+        "",
+        "Start directly with the explanation: do not write the app name, headings or greetings.",
+        "Structure: first what they share and why it makes living together easier, then what they should agree on, and end with a practical, specific tip.",
+        "Write between 90 and 130 words of flowing text, without titles, lists or markdown.",
+        "Use a warm, respectful tone. Do not invent facts that are not in the lists.",
+        "The response must end with a complete sentence.");
+  }
+
+  private static String enEspanol(SolicitudTextoDto solicitud) {
     String usuario = solicitud.nombreUsuario();
     String candidato = solicitud.nombreCandidato();
     return String.join("\n",
