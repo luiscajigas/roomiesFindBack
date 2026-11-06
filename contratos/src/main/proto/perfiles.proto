@@ -13,6 +13,8 @@ service Perfiles {
   rpc ValidarRegistro(ValidarRegistroRequest) returns (google.protobuf.Empty);
   rpc CrearPerfil(CrearPerfilRequest) returns (Perfil);
   rpc ObtenerPerfil(ObtenerPerfilRequest) returns (Perfil);
+  // Varios perfiles en una sola llamada. Los que no existen simplemente no vienen.
+  rpc ObtenerPerfiles(ObtenerPerfilesRequest) returns (ObtenerPerfilesResponse);
   rpc ActualizarPerfil(ActualizarPerfilRequest) returns (Perfil);
   rpc ListarCandidatos(ListarCandidatosRequest) returns (ListarCandidatosResponse);
   rpc ObtenerFoto(ObtenerFotoRequest) returns (Foto);
@@ -67,6 +69,14 @@ message CrearPerfilRequest {
 
 message ObtenerPerfilRequest {
   int32 usuario_id = 1;
+}
+
+message ObtenerPerfilesRequest {
+  repeated int32 usuario_ids = 1;
+}
+
+message ObtenerPerfilesResponse {
+  repeated Perfil perfiles = 1;
 }
 
 message ActualizarPerfilRequest {
