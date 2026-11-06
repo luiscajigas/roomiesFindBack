@@ -6,12 +6,15 @@ import com.roomiesfind.contratos.chat.Mensaje;
 import com.roomiesfind.contratos.chat.ObtenerMensajesRequest;
 import com.roomiesfind.contratos.chat.ObtenerMensajesResponse;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.orquestacion.ConsultaPerfiles;
 import com.roomiesfind.infraestructura.rest.ErrorRest;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,18 +29,31 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatRest {
 
   private final ClientesGrpc clientes;
+  private final ConsultaPerfiles perfiles;
 
-  public ChatRest(ClientesGrpc clientes) {
+  public ChatRest(ClientesGrpc clientes, ConsultaPerfiles perfiles) {
     this.clientes = clientes;
+    this.perfiles = perfiles;
   }
 
   @RequiereAuth
   @GetMapping("/conversaciones")
   List<Map<String, Object>> conversaciones(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
-    return clientes.chat()
+    List<Conversacion> conversaciones = clientes.chat()
         .listarConversaciones(ListarConversacionesRequest.newBuilder().setUsuarioId(usuarioId).build())
-        .getConversacionesList().stream()
-        .map(ChatRest::aMapa)
+        .getConversacionesList();
+    Map<Object, Map<String, Object>> personas = perfiles
+        .personas(conversaciones.stream().map(Conversacion::getOtroId).toList()).stream()
+        .collect(Collectors.toMap((persona) -> persona.get("id"), Function.identity()));
+
+    return conversaciones.stream()
+        // Si la otra persona ya no existe, su conversación no se muestra.
+        .filter((conversacion) -> personas.containsKey(conversacion.getOtroId()))
+        .map((conversacion) -> {
+          Map<String, Object> mapa = aMapa(conversacion);
+          mapa.put("persona", personas.get(conversacion.getOtroId()));
+          return mapa;
+        })
         .toList();
   }
 
