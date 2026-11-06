@@ -26,6 +26,8 @@ message ExplicarRequest {
   double score = 3;
   repeated string coincidencias = 4;
   repeated string conflictos = 5;
+  // "es" o "en". Si no llega, español.
+  string idioma = 6;
 }
 
 message ExplicarResponse {
