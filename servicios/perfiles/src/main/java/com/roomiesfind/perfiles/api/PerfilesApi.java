@@ -4,6 +4,9 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import com.roomiesfind.comun.RespuestaGrpc;
 import com.roomiesfind.contratos.perfiles.ActualizarPerfilRequest;
+import com.roomiesfind.contratos.perfiles.BuscarCandidatosRequest;
+import com.roomiesfind.contratos.perfiles.BuscarCandidatosResponse;
+import com.roomiesfind.contratos.perfiles.CandidatoPuntuado;
 import com.roomiesfind.contratos.perfiles.CrearPerfilRequest;
 import com.roomiesfind.contratos.perfiles.DatosPerfil;
 import com.roomiesfind.contratos.perfiles.Foto;
@@ -17,10 +20,13 @@ import com.roomiesfind.contratos.perfiles.ObtenerPerfilesRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilesResponse;
 import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.contratos.perfiles.PerfilesGrpc;
+import com.roomiesfind.contratos.perfiles.ResumenNiveles;
 import com.roomiesfind.contratos.perfiles.ValidarRegistroRequest;
 import com.roomiesfind.perfiles.controller.PerfilController;
 import com.roomiesfind.perfiles.dto.DatosPerfilDto;
+import com.roomiesfind.perfiles.dto.FiltrosCandidatosDto;
 import com.roomiesfind.perfiles.dto.FotoDto;
+import com.roomiesfind.perfiles.dto.PaginaCandidatosDto;
 import com.roomiesfind.perfiles.dto.PerfilDto;
 import io.grpc.stub.StreamObserver;
 import org.springframework.stereotype.Component;
@@ -74,6 +80,37 @@ public class PerfilesApi extends PerfilesGrpc.PerfilesImplBase {
     RespuestaGrpc.responder(observador, () -> ListarCandidatosResponse.newBuilder()
         .addAllPerfiles(controller.candidatos(request.getExcluirUsuarioId()).stream().map(PerfilesApi::aPerfil).toList())
         .build());
+  }
+
+  @Override
+  public void buscarCandidatos(BuscarCandidatosRequest request, StreamObserver<BuscarCandidatosResponse> observador) {
+    RespuestaGrpc.responder(observador, () -> {
+      PaginaCandidatosDto pagina = controller.buscarCandidatos(new FiltrosCandidatosDto(
+          request.getUsuarioId(),
+          request.getExcluirIdsList(),
+          request.getPagina(),
+          request.getTamano(),
+          request.getOrden(),
+          request.getZonasList(),
+          request.hasHorario() ? request.getHorario() : null,
+          request.hasPresupuestoMaximo() ? request.getPresupuestoMaximo() : null,
+          request.hasMascotas() ? request.getMascotas() : null,
+          request.hasPuntajeMinimo() ? request.getPuntajeMinimo() : null));
+      return BuscarCandidatosResponse.newBuilder()
+          .addAllCandidatos(pagina.candidatos().stream()
+              .map((candidato) -> CandidatoPuntuado.newBuilder()
+                  .setPerfil(aPerfil(candidato.perfil()))
+                  .setPuntaje(candidato.puntaje())
+                  .build())
+              .toList())
+          .setTotal(pagina.total())
+          .setResumen(ResumenNiveles.newBuilder()
+              .setMuyBien(pagina.muyBien())
+              .setBuena(pagina.buena())
+              .setConversar(pagina.conversar())
+              .setDistintos(pagina.distintos()))
+          .build();
+    });
   }
 
   @Override
