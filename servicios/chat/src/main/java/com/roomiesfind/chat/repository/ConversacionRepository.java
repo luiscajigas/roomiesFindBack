@@ -33,6 +33,16 @@ public class ConversacionRepository {
         Long.class, Math.min(usuarioId, otroId), Math.max(usuarioId, otroId));
   }
 
+  public List<Integer> interlocutores(int usuarioId) {
+    return jdbc.queryForList(
+        """
+        SELECT usuario_b FROM conversaciones WHERE usuario_a = ?
+        UNION
+        SELECT usuario_a FROM conversaciones WHERE usuario_b = ?
+        """,
+        Integer.class, usuarioId, usuarioId);
+  }
+
   /** Conversaciones de una persona, con su último mensaje y lo que le falta por leer. */
   public List<ConversacionDto> listar(int usuarioId) {
     return jdbc.query(

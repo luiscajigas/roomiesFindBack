@@ -32,6 +32,10 @@ public class ChatService {
     return conversaciones.listar(usuarioId);
   }
 
+  public List<Integer> interlocutores(int usuarioId) {
+    return conversaciones.interlocutores(usuarioId);
+  }
+
   public PaginaMensajesDto mensajes(int usuarioId, int otroId, Long antesDe, int limite) {
     Optional<Long> conversacion = conversaciones.buscar(usuarioId, otroId);
     if (conversacion.isEmpty()) return new PaginaMensajesDto(List.of(), false);
