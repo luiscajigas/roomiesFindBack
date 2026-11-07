@@ -80,12 +80,6 @@ public class PerfilesRest {
   }
 
   @RequiereAuth
-  @GetMapping("/candidatos")
-  List<Map<String, Object>> candidatos(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
-    return consulta.candidatos(usuarioId);
-  }
-
-  @RequiereAuth
   @GetMapping("/{usuarioId}")
   Map<String, Object> persona(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int yo,
       @PathVariable String usuarioId) {

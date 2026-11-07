@@ -5,7 +5,6 @@ import com.roomiesfind.contratos.moderacion.UsuarioRequest;
 import com.roomiesfind.contratos.perfiles.BuscarCandidatosRequest;
 import com.roomiesfind.contratos.perfiles.BuscarCandidatosResponse;
 import com.roomiesfind.contratos.perfiles.CandidatoPuntuado;
-import com.roomiesfind.contratos.perfiles.ListarCandidatosRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilesRequest;
 import com.roomiesfind.contratos.perfiles.Perfil;
@@ -44,13 +43,6 @@ public class ConsultaPerfiles {
     respuesta.putAll(aMapa(perfil));
     respuesta.put("alerta", conAlerta(List.of(usuarioId)).contains(usuarioId));
     return respuesta;
-  }
-
-  public List<Map<String, Object>> candidatos(int usuarioId) {
-    List<Perfil> perfiles = clientes.perfiles()
-        .listarCandidatos(ListarCandidatosRequest.newBuilder().setExcluirUsuarioId(usuarioId).build())
-        .getPerfilesList();
-    return conNombre(perfiles);
   }
 
   /**
