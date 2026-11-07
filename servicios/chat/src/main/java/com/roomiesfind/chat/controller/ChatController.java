@@ -1,5 +1,6 @@
 package com.roomiesfind.chat.controller;
 
+import com.roomiesfind.chat.cliente.ModeracionCliente;
 import com.roomiesfind.chat.dto.ConversacionDto;
 import com.roomiesfind.chat.dto.MensajeDto;
 import com.roomiesfind.chat.dto.PaginaMensajesDto;
@@ -21,10 +22,12 @@ public class ChatController {
 
   private final ChatService chat;
   private final PublicadorEventos eventos;
+  private final ModeracionCliente moderacion;
 
-  public ChatController(ChatService chat, PublicadorEventos eventos) {
+  public ChatController(ChatService chat, PublicadorEventos eventos, ModeracionCliente moderacion) {
     this.chat = chat;
     this.eventos = eventos;
+    this.moderacion = moderacion;
   }
 
   public List<ConversacionDto> conversaciones(int usuarioId) {
@@ -33,6 +36,7 @@ public class ChatController {
 
   public PaginaMensajesDto mensajes(int usuarioId, int otroId, Long antesDe, int limite) {
     validarOtraPersona(usuarioId, otroId);
+    validarSinBloqueo(usuarioId, otroId);
     int tamano = limite <= 0 ? MENSAJES_POR_PAGINA : Math.min(limite, MAXIMO_POR_PAGINA);
     return chat.mensajes(usuarioId, otroId, antesDe, tamano);
   }
@@ -40,6 +44,7 @@ public class ChatController {
   public MensajeDto enviar(int remitenteId, int destinatarioId, String contenido) {
     validarOtraPersona(remitenteId, destinatarioId);
     String texto = validarContenido(contenido);
+    validarSinBloqueo(remitenteId, destinatarioId);
     MensajeDto mensaje = chat.enviar(remitenteId, destinatarioId, texto);
     // También va al remitente, para que lo vea en sus otras pestañas.
     eventos.publicar(destinatarioId, TraductorEventos.eventoMensaje(mensaje));
@@ -57,7 +62,26 @@ public class ChatController {
 
   public void notificarEscribiendo(int usuarioId, int destinatarioId) {
     validarOtraPersona(usuarioId, destinatarioId);
+    validarSinBloqueo(usuarioId, destinatarioId);
     eventos.publicar(destinatarioId, TraductorEventos.eventoEscribiendo(usuarioId));
+  }
+
+  public void avisarAlerta(int usuarioId) {
+    for (int otroId : chat.interlocutores(usuarioId)) {
+      eventos.publicar(otroId, TraductorEventos.eventoAlerta(usuarioId));
+    }
+  }
+
+  public void avisarBloqueo(int usuarioId, int otroId) {
+    eventos.publicar(usuarioId, TraductorEventos.eventoBloqueo(otroId));
+    eventos.publicar(otroId, TraductorEventos.eventoBloqueo(usuarioId));
+  }
+
+  /** Se comprueba aquí y no en el navegador, para que el bloqueo no se pueda saltar. Si no se puede comprobar, no se entrega. */
+  private void validarSinBloqueo(int usuarioId, int otroId) {
+    if (moderacion.estanBloqueados(usuarioId, otroId)) {
+      throw ErrorNegocio.noEncontrado("No puedes conversar con esta persona.");
+    }
   }
 
   static void validarOtraPersona(int usuarioId, int otroId) {

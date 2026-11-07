@@ -42,7 +42,7 @@ class ChatReglasTest {
 
   @Test
   void validaAntesDeGuardar() {
-    ChatController controller = new ChatController((ChatService) null, (PublicadorEventos) null);
+    ChatController controller = new ChatController((ChatService) null, (PublicadorEventos) null, null);
     assertEquals("No puedes enviar mensajes a tu propia cuenta.",
         assertThrows(ErrorNegocio.class, () -> controller.enviar(1, 1, "Hola")).getMessage());
     assertEquals("La persona no existe.",
