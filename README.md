@@ -44,6 +44,7 @@ Ningún microservicio expone HTTP y ningún módulo llama a otro por REST. El ú
 | `servicios/compatibilidad` | Historial de puntajes y explicaciones guardadas | `recomendaciones`, `explicaciones_ia` | 9093 |
 | `servicios/ia` | Redacta explicaciones con Claude y Gemini de respaldo | | 9094 |
 | `servicios/chat` | Conversaciones y mensajes en tiempo real, con Redis | `conversaciones`, `mensajes` | 9095 |
+| `servicios/moderacion` | Bloqueos, reportes y alertas de cuentas muy reportadas | `bloqueos`, `reportes`, `alertas_cuenta` | 9096 |
 | `infraestructura` | Orquestador: puerta de entrada, registro, tablas y Docker | crea el esquema | HTTP 3001 |
 
 Cada servicio solo consulta sus propias tablas. Si necesita datos de otro, los pide por gRPC.
@@ -89,6 +90,18 @@ Navegador ⇄ WebSocket ⇄ orquestador ──gRPC──▶ servicios/chat ─�
 4. Cada instancia del servicio recibe de Redis los eventos y los entrega a sus streams abiertos. Así el chat funciona igual con varias copias del servicio.
 
 El orquestador no conoce Redis: solo habla con `servicios/chat` por gRPC. Si Redis se cae, los mensajes siguen guardándose y solo se pierde el aviso en vivo hasta que vuelva.
+
+## Moderación
+
+`servicios/moderacion` guarda los bloqueos y los reportes.
+
+- **Bloquear** funciona en los dos sentidos: ninguna de las dos personas ve a la otra en las búsquedas ni en el chat. `servicios/chat` lo consulta por gRPC antes de entregar un mensaje, así que no se puede saltar desde el navegador. Al desbloquear, la conversación vuelve con su historial.
+- **Reportar**: cada persona puede reportar a la misma cuenta una sola vez y máximo 10 cuentas al día.
+- **Alerta**: con 3 reportes de personas distintas, la cuenta muestra un aviso en su tarjeta y en el chat, y quienes ya conversan con ella reciben un aviso en vivo. El aviso es prudente porque un reporte no prueba nada. No oculta la cuenta ni dice quién reportó.
+
+## Búsqueda de compañeros
+
+`servicios/perfiles` filtra, calcula el puntaje y entrega una página cada vez (`GET /api/perfiles/buscar`). Las reglas del puntaje están en SQL porque hay que conocerlo antes de traer a las personas para poder ordenar por él, y también en el Web Worker del frontend, que además explica las razones. Si cambian, hay que cambiarlas en los dos.
 
 ## Ejecutar
 
