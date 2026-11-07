@@ -83,10 +83,6 @@ public class PerfilService {
     return obtener(usuarioId);
   }
 
-  public List<PerfilDto> candidatos(int excluirUsuarioId) {
-    return perfiles.listarExcepto(excluirUsuarioId).stream().map(PerfilService::aDto).toList();
-  }
-
   public PaginaCandidatosDto buscarCandidatos(FiltrosCandidatosDto filtros) {
     PerfilRepository.Conteos conteos = perfiles.contarCandidatos(filtros);
     List<CandidatoDto> candidatos = perfiles.buscarCandidatos(filtros).stream()

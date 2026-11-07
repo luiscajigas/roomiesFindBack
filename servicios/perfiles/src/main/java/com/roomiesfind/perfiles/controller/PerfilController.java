@@ -58,10 +58,6 @@ public class PerfilController {
     return perfiles.actualizar(usuarioId, datos);
   }
 
-  public List<PerfilDto> candidatos(int excluirUsuarioId) {
-    return perfiles.candidatos(excluirUsuarioId);
-  }
-
   public PaginaCandidatosDto buscarCandidatos(FiltrosCandidatosDto filtros) {
     return perfiles.buscarCandidatos(ReglasBusqueda.normalizar(filtros));
   }

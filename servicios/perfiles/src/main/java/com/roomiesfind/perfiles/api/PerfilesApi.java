@@ -12,8 +12,6 @@ import com.roomiesfind.contratos.perfiles.DatosPerfil;
 import com.roomiesfind.contratos.perfiles.Foto;
 import com.roomiesfind.contratos.perfiles.GuardarFotoRequest;
 import com.roomiesfind.contratos.perfiles.GuardarFotoResponse;
-import com.roomiesfind.contratos.perfiles.ListarCandidatosRequest;
-import com.roomiesfind.contratos.perfiles.ListarCandidatosResponse;
 import com.roomiesfind.contratos.perfiles.ObtenerFotoRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilesRequest;
@@ -73,13 +71,6 @@ public class PerfilesApi extends PerfilesGrpc.PerfilesImplBase {
   @Override
   public void actualizarPerfil(ActualizarPerfilRequest request, StreamObserver<Perfil> observador) {
     RespuestaGrpc.responder(observador, () -> aPerfil(controller.actualizar(request.getUsuarioId(), aDatos(request.getDatos()))));
-  }
-
-  @Override
-  public void listarCandidatos(ListarCandidatosRequest request, StreamObserver<ListarCandidatosResponse> observador) {
-    RespuestaGrpc.responder(observador, () -> ListarCandidatosResponse.newBuilder()
-        .addAllPerfiles(controller.candidatos(request.getExcluirUsuarioId()).stream().map(PerfilesApi::aPerfil).toList())
-        .build());
   }
 
   @Override

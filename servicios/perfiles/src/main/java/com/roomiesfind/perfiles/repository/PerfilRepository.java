@@ -170,10 +170,6 @@ public class PerfilRepository {
     return String.join(", ", Collections.nCopies(cantidad, "?"));
   }
 
-  public List<Perfil> listarExcepto(int usuarioId) {
-    return jdbc.query(SELECT_PERFIL + "WHERE p.usuario_id != ? ORDER BY p.usuario_id", FILA, usuarioId);
-  }
-
   public void actualizar(int usuarioId, CambiosPerfil cambios) {
     jdbc.update(
         """
