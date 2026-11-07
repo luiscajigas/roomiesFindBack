@@ -1,6 +1,8 @@
 package com.roomiesfind.chat.eventos;
 
 import com.roomiesfind.chat.dto.MensajeDto;
+import com.roomiesfind.contratos.chat.AlertaCuenta;
+import com.roomiesfind.contratos.chat.BloqueoCambiado;
 import com.roomiesfind.contratos.chat.EventoChat;
 import com.roomiesfind.contratos.chat.Mensaje;
 import com.roomiesfind.contratos.chat.MensajesLeidos;
@@ -30,6 +32,14 @@ public final class TraductorEventos {
     return EventoChat.newBuilder()
         .setLeidos(MensajesLeidos.newBuilder().setLectorId(lectorId).setRemitenteId(remitenteId).setLeidoEn(leidoEn))
         .build();
+  }
+
+  public static EventoChat eventoAlerta(int usuarioId) {
+    return EventoChat.newBuilder().setAlerta(AlertaCuenta.newBuilder().setUsuarioId(usuarioId)).build();
+  }
+
+  public static EventoChat eventoBloqueo(int usuarioId) {
+    return EventoChat.newBuilder().setBloqueo(BloqueoCambiado.newBuilder().setUsuarioId(usuarioId)).build();
   }
 
   public static EventoChat eventoEscribiendo(int usuarioId) {
