@@ -205,6 +205,14 @@ public class ChatWebSocket extends TextWebSocketHandler {
         mapa.put("tipo", "escribiendo");
         mapa.put("usuarioId", evento.getEscribiendo().getUsuarioId());
       }
+      case ALERTA -> {
+        mapa.put("tipo", "alerta");
+        mapa.put("usuarioId", evento.getAlerta().getUsuarioId());
+      }
+      case BLOQUEO -> {
+        mapa.put("tipo", "bloqueo");
+        mapa.put("usuarioId", evento.getBloqueo().getUsuarioId());
+      }
       default -> mapa.put("tipo", "desconocido");
     }
     return mapa;
