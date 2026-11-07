@@ -112,6 +112,37 @@ CREATE INDEX IF NOT EXISTS idx_conversaciones_b ON conversaciones(usuario_b);
 CREATE INDEX IF NOT EXISTS idx_mensajes_conversacion ON mensajes(conversacion_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_mensajes_sin_leer ON mensajes(conversacion_id, remitente_id) WHERE leido_en IS NULL;
 
+-- Moderación: quien bloquea deja de ver a la otra persona y ella a quien la bloqueó.
+CREATE TABLE IF NOT EXISTS bloqueos (
+  bloqueador_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  bloqueado_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (bloqueador_id, bloqueado_id),
+  CHECK (bloqueador_id <> bloqueado_id)
+);
+
+-- Cada persona puede reportar a la misma cuenta una sola vez.
+CREATE TABLE IF NOT EXISTS reportes (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reportante_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  reportado_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  motivo VARCHAR(30) NOT NULL CHECK (motivo IN ('acoso','perfil_falso','estafa','contenido_inapropiado','otro')),
+  detalle TEXT CHECK (char_length(detalle) <= 500),
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (reportante_id, reportado_id),
+  CHECK (reportante_id <> reportado_id)
+);
+
+-- Cuentas que llegaron al límite de reportes de personas distintas.
+CREATE TABLE IF NOT EXISTS alertas_cuenta (
+  usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+  activada_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bloqueos_bloqueado ON bloqueos(bloqueado_id);
+CREATE INDEX IF NOT EXISTS idx_reportes_reportado ON reportes(reportado_id);
+CREATE INDEX IF NOT EXISTS idx_reportes_reportante ON reportes(reportante_id, creado_en);
+
 CREATE INDEX IF NOT EXISTS idx_perfiles_zona ON perfiles(zona_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_usuario ON recomendaciones(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_recomendaciones_candidato ON recomendaciones(candidato_id);
