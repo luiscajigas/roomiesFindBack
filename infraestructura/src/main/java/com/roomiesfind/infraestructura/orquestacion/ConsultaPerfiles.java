@@ -1,5 +1,10 @@
 package com.roomiesfind.infraestructura.orquestacion;
 
+import com.roomiesfind.contratos.moderacion.CuentasRequest;
+import com.roomiesfind.contratos.moderacion.UsuarioRequest;
+import com.roomiesfind.contratos.perfiles.BuscarCandidatosRequest;
+import com.roomiesfind.contratos.perfiles.BuscarCandidatosResponse;
+import com.roomiesfind.contratos.perfiles.CandidatoPuntuado;
 import com.roomiesfind.contratos.perfiles.ListarCandidatosRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilesRequest;
@@ -10,6 +15,7 @@ import com.roomiesfind.infraestructura.config.ClientesGrpc;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -36,6 +42,7 @@ public class ConsultaPerfiles {
     respuesta.put("nombre", usuario == null ? null : usuario.getNombre());
     respuesta.put("email", usuario == null ? null : usuario.getEmail());
     respuesta.putAll(aMapa(perfil));
+    respuesta.put("alerta", conAlerta(List.of(usuarioId)).contains(usuarioId));
     return respuesta;
   }
 
@@ -44,6 +51,42 @@ public class ConsultaPerfiles {
         .listarCandidatos(ListarCandidatosRequest.newBuilder().setExcluirUsuarioId(usuarioId).build())
         .getPerfilesList();
     return conNombre(perfiles);
+  }
+
+  /**
+   * Una página de personas. Une tres servicios: moderación dice a quién no mostrar,
+   * perfiles filtra y ordena, y usuarios pone el nombre.
+   */
+  public Map<String, Object> buscar(int usuarioId, BuscarCandidatosRequest.Builder peticion) {
+    BuscarCandidatosResponse pagina = clientes.perfiles().buscarCandidatos(peticion
+        .setUsuarioId(usuarioId)
+        .addAllExcluirIds(excluidos(usuarioId))
+        .build());
+    List<CandidatoPuntuado> encontrados = pagina.getCandidatosList();
+    Map<Integer, Integer> puntajes = encontrados.stream()
+        .collect(Collectors.toMap((candidato) -> candidato.getPerfil().getUsuarioId(), CandidatoPuntuado::getPuntaje));
+
+    List<Map<String, Object>> candidatos = conNombre(encontrados.stream().map(CandidatoPuntuado::getPerfil).toList());
+    candidatos.forEach((candidato) -> candidato.put("puntaje", puntajes.get((Integer) candidato.get("id"))));
+
+    Map<String, Object> resumen = new LinkedHashMap<>();
+    resumen.put("muyBien", pagina.getResumen().getMuyBien());
+    resumen.put("buena", pagina.getResumen().getBuena());
+    resumen.put("conversar", pagina.getResumen().getConversar());
+    resumen.put("distintos", pagina.getResumen().getDistintos());
+
+    Map<String, Object> respuesta = new LinkedHashMap<>();
+    respuesta.put("candidatos", candidatos);
+    respuesta.put("total", pagina.getTotal());
+    respuesta.put("resumen", resumen);
+    return respuesta;
+  }
+
+  /** Quien bloqueó o fue bloqueado no aparece en ninguna parte para la otra persona. */
+  public Set<Integer> excluidos(int usuarioId) {
+    return Set.copyOf(clientes.moderacion()
+        .listarExcluidos(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build())
+        .getIdsList());
   }
 
   /** Solo las personas pedidas, para no traer a todos los usuarios cuando no hace falta. */
@@ -55,7 +98,9 @@ public class ConsultaPerfiles {
   }
 
   private List<Map<String, Object>> conNombre(List<Perfil> perfiles) {
-    Map<Integer, Usuario> usuarios = usuarios(perfiles.stream().map(Perfil::getUsuarioId).toList());
+    List<Integer> ids = perfiles.stream().map(Perfil::getUsuarioId).toList();
+    Map<Integer, Usuario> usuarios = usuarios(ids);
+    Set<Integer> conAlerta = conAlerta(ids);
 
     return perfiles.stream()
         // Un perfil cuyo usuario ya no existe no se muestra.
@@ -65,9 +110,17 @@ public class ConsultaPerfiles {
           candidato.put("id", perfil.getUsuarioId());
           candidato.put("nombre", usuarios.get(perfil.getUsuarioId()).getNombre());
           candidato.putAll(aMapa(perfil));
+          candidato.put("alerta", conAlerta.contains(perfil.getUsuarioId()));
           return candidato;
         })
         .toList();
+  }
+
+  private Set<Integer> conAlerta(List<Integer> ids) {
+    if (ids.isEmpty()) return Set.of();
+    return Set.copyOf(clientes.moderacion()
+        .cuentasConAlerta(CuentasRequest.newBuilder().addAllIds(ids).build())
+        .getIdsList());
   }
 
   private Map<Integer, Usuario> usuarios(List<Integer> ids) {
