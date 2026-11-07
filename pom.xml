@@ -25,6 +25,7 @@
     <module>servicios/compatibilidad</module>
     <module>servicios/ia</module>
     <module>servicios/chat</module>
+    <module>servicios/moderacion</module>
     <module>infraestructura</module>
   </modules>
 
