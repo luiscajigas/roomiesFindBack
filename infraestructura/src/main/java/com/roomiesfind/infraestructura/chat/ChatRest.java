@@ -13,6 +13,7 @@ import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -42,12 +43,13 @@ public class ChatRest {
     List<Conversacion> conversaciones = clientes.chat()
         .listarConversaciones(ListarConversacionesRequest.newBuilder().setUsuarioId(usuarioId).build())
         .getConversacionesList();
+    Set<Integer> excluidos = perfiles.excluidos(usuarioId);
     Map<Object, Map<String, Object>> personas = perfiles
-        .personas(conversaciones.stream().map(Conversacion::getOtroId).toList()).stream()
+        .personas(conversaciones.stream().map(Conversacion::getOtroId).filter((id) -> !excluidos.contains(id)).toList()).stream()
         .collect(Collectors.toMap((persona) -> persona.get("id"), Function.identity()));
 
     return conversaciones.stream()
-        // Si la otra persona ya no existe, su conversación no se muestra.
+        // Si la otra persona ya no existe o hay un bloqueo, su conversación no se muestra.
         .filter((conversacion) -> personas.containsKey(conversacion.getOtroId()))
         .map((conversacion) -> {
           Map<String, Object> mapa = aMapa(conversacion);
