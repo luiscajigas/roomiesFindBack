@@ -2,6 +2,7 @@ package com.roomiesfind.infraestructura.rest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.roomiesfind.contratos.perfiles.ActualizarPerfilRequest;
+import com.roomiesfind.contratos.perfiles.BuscarCandidatosRequest;
 import com.roomiesfind.contratos.perfiles.DatosPerfil;
 import com.roomiesfind.contratos.perfiles.Foto;
 import com.roomiesfind.contratos.perfiles.GuardarFotoRequest;
@@ -86,9 +87,49 @@ public class PerfilesRest {
 
   @RequiereAuth
   @GetMapping("/{usuarioId}")
-  Map<String, Object> persona(@PathVariable String usuarioId) {
-    return consulta.personas(List.of(leerId(usuarioId))).stream().findFirst()
+  Map<String, Object> persona(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int yo,
+      @PathVariable String usuarioId) {
+    int id = leerId(usuarioId);
+    // Para quien bloqueó o fue bloqueado, la otra persona no existe.
+    if (consulta.excluidos(yo).contains(id)) throw new ErrorRest(HttpStatus.NOT_FOUND, "Perfil no encontrado.");
+    return consulta.personas(List.of(id)).stream().findFirst()
         .orElseThrow(() -> new ErrorRest(HttpStatus.NOT_FOUND, "Perfil no encontrado."));
+  }
+
+  /** Una página de personas con los filtros que lleguen. Lo que no llega no se filtra. */
+  @RequiereAuth
+  @GetMapping("/buscar")
+  Map<String, Object> buscar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+      @RequestParam(required = false) String pagina,
+      @RequestParam(required = false) String tamano,
+      @RequestParam(required = false) String orden,
+      @RequestParam(value = "zona", required = false) List<String> zonas,
+      @RequestParam(required = false) String horario,
+      @RequestParam(required = false) String presupuestoMaximo,
+      @RequestParam(required = false) String mascotas,
+      @RequestParam(required = false) String puntajeMinimo) {
+    BuscarCandidatosRequest.Builder peticion = BuscarCandidatosRequest.newBuilder();
+    if (tieneTexto(pagina)) peticion.setPagina(leerEntero(pagina));
+    if (tieneTexto(tamano)) peticion.setTamano(leerEntero(tamano));
+    if (tieneTexto(orden)) peticion.setOrden(orden);
+    if (zonas != null) peticion.addAllZonas(zonas.stream().filter(PerfilesRest::tieneTexto).toList());
+    if (tieneTexto(horario)) peticion.setHorario(horario);
+    if (tieneTexto(presupuestoMaximo)) peticion.setPresupuestoMaximo(leerEntero(presupuestoMaximo));
+    if (tieneTexto(mascotas)) peticion.setMascotas(mascotas);
+    if (tieneTexto(puntajeMinimo)) peticion.setPuntajeMinimo(leerEntero(puntajeMinimo));
+    return consulta.buscar(usuarioId, peticion);
+  }
+
+  private static boolean tieneTexto(String valor) {
+    return valor != null && !valor.isBlank();
+  }
+
+  private static int leerEntero(String texto) {
+    try {
+      return Integer.parseInt(texto.trim());
+    } catch (NumberFormatException error) {
+      throw new ErrorRest(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
+    }
   }
 
   private static int leerId(String texto) {
