@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package roomiesfind.moderacion;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.roomiesfind.contratos.moderacion";
+
+// Bloqueos, reportes y alertas de cuentas muy reportadas.
+service Moderacion {
+  rpc Bloquear(ParejaRequest) returns (google.protobuf.Empty);
+  rpc Desbloquear(ParejaRequest) returns (google.protobuf.Empty);
+  // Personas que este usuario bloqueó.
+  rpc ListarBloqueados(UsuarioRequest) returns (IdsResponse);
+  // Personas que no debe ver: las que bloqueó y las que lo bloquearon.
+  rpc ListarExcluidos(UsuarioRequest) returns (IdsResponse);
+  rpc EstanBloqueados(ParejaRequest) returns (EstanBloqueadosResponse);
+  rpc Reportar(ReportarRequest) returns (ReportarResponse);
+  // De estas cuentas, las que tienen alerta activa.
+  rpc CuentasConAlerta(CuentasRequest) returns (IdsResponse);
+}
+
+message ParejaRequest {
+  int32 usuario_id = 1;
+  int32 otro_id = 2;
+}
+
+message UsuarioRequest {
+  int32 usuario_id = 1;
+}
+
+message CuentasRequest {
+  repeated int32 ids = 1;
+}
+
+message IdsResponse {
+  repeated int32 ids = 1;
+}
+
+message EstanBloqueadosResponse {
+  bool bloqueados = 1;
+}
+
+message ReportarRequest {
+  int32 reportante_id = 1;
+  int32 reportado_id = 2;
+  string motivo = 3;
+  string detalle = 4;
+}
+
+message ReportarResponse {
+  // Solo es true para el reporte que hizo llegar la cuenta al límite.
+  bool alerta_activada = 1;
+}
