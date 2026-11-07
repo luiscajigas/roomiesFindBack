@@ -14,6 +14,10 @@ service Chat {
   rpc EnviarMensaje(EnviarMensajeRequest) returns (Mensaje);
   rpc MarcarLeidos(MarcarLeidosRequest) returns (google.protobuf.Empty);
   rpc NotificarEscribiendo(NotificarEscribiendoRequest) returns (google.protobuf.Empty);
+  // Avisa en vivo a quienes conversan con una cuenta que acaba de recibir una alerta.
+  rpc AvisarAlerta(AvisarAlertaRequest) returns (google.protobuf.Empty);
+  // Avisa en vivo a las dos personas que su conversación se cerró o se reabrió.
+  rpc AvisarBloqueo(AvisarBloqueoRequest) returns (google.protobuf.Empty);
   // Stream abierto mientras la persona está conectada: entrega sus eventos en vivo.
   rpc EscucharEventos(EscucharEventosRequest) returns (stream EventoChat);
 }
@@ -70,6 +74,15 @@ message NotificarEscribiendoRequest {
   int32 destinatario_id = 2;
 }
 
+message AvisarAlertaRequest {
+  int32 usuario_id = 1;
+}
+
+message AvisarBloqueoRequest {
+  int32 usuario_id = 1;
+  int32 otro_id = 2;
+}
+
 message EscucharEventosRequest {
   int32 usuario_id = 1;
 }
@@ -79,6 +92,8 @@ message EventoChat {
     Mensaje mensaje = 1;
     MensajesLeidos leidos = 2;
     PersonaEscribiendo escribiendo = 3;
+    AlertaCuenta alerta = 4;
+    BloqueoCambiado bloqueo = 5;
   }
 }
 
@@ -89,5 +104,13 @@ message MensajesLeidos {
 }
 
 message PersonaEscribiendo {
+  int32 usuario_id = 1;
+}
+
+message AlertaCuenta {
+  int32 usuario_id = 1;
+}
+
+message BloqueoCambiado {
   int32 usuario_id = 1;
 }
