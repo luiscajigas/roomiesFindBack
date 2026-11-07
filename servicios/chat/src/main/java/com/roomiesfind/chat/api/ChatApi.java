@@ -7,6 +7,8 @@ import com.roomiesfind.chat.dto.PaginaMensajesDto;
 import com.roomiesfind.chat.eventos.SuscriptoresEventos;
 import com.roomiesfind.chat.eventos.TraductorEventos;
 import com.roomiesfind.comun.RespuestaGrpc;
+import com.roomiesfind.contratos.chat.AvisarAlertaRequest;
+import com.roomiesfind.contratos.chat.AvisarBloqueoRequest;
 import com.roomiesfind.contratos.chat.ChatGrpc;
 import com.roomiesfind.contratos.chat.Conversacion;
 import com.roomiesfind.contratos.chat.EnviarMensajeRequest;
@@ -75,6 +77,22 @@ public class ChatApi extends ChatGrpc.ChatImplBase {
   public void notificarEscribiendo(NotificarEscribiendoRequest request, StreamObserver<Empty> observador) {
     RespuestaGrpc.responder(observador, () -> {
       controller.notificarEscribiendo(request.getUsuarioId(), request.getDestinatarioId());
+      return Empty.getDefaultInstance();
+    });
+  }
+
+  @Override
+  public void avisarAlerta(AvisarAlertaRequest request, StreamObserver<Empty> observador) {
+    RespuestaGrpc.responder(observador, () -> {
+      controller.avisarAlerta(request.getUsuarioId());
+      return Empty.getDefaultInstance();
+    });
+  }
+
+  @Override
+  public void avisarBloqueo(AvisarBloqueoRequest request, StreamObserver<Empty> observador) {
+    RespuestaGrpc.responder(observador, () -> {
+      controller.avisarBloqueo(request.getUsuarioId(), request.getOtroId());
       return Empty.getDefaultInstance();
     });
   }
