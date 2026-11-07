@@ -7,8 +7,8 @@ import "google/protobuf/empty.proto";
 option java_multiple_files = true;
 option java_package = "com.roomiesfind.contratos.compatibilidad";
 
-// Historial de puntajes y explicaciones guardadas. El puntaje lo calcula el
-// frontend; este servicio solo lo registra y pide que se interprete.
+// Historial de puntajes y explicaciones guardadas. El puntaje lo calculan
+// perfiles y el frontend; este servicio solo lo registra y pide que se interprete.
 service Compatibilidad {
   rpc RegistrarRecomendacion(RegistrarRecomendacionRequest) returns (google.protobuf.Empty);
   rpc Explicar(ExplicarRequest) returns (ExplicarResponse);
