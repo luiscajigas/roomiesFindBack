@@ -2,9 +2,12 @@ package com.roomiesfind.chat;
 
 import com.roomiesfind.chat.api.ChatApi;
 import com.roomiesfind.chat.eventos.SuscriptoresEventos;
+import com.roomiesfind.comun.CanalGrpc;
 import com.roomiesfind.comun.ConexionBaseDatos;
 import com.roomiesfind.comun.ServidorGrpc;
+import com.roomiesfind.contratos.moderacion.ModeracionGrpc;
 import com.zaxxer.hikari.HikariDataSource;
+import io.grpc.ManagedChannel;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
@@ -24,6 +27,16 @@ public class ChatApplication {
   @Bean
   ServidorGrpc servidorGrpc(@Value("${GRPC_PUERTO:9095}") int puerto, ChatApi api) {
     return new ServidorGrpc(puerto, api);
+  }
+
+  @Bean(destroyMethod = "shutdown")
+  ManagedChannel canalModeracion(@Value("${GRPC_MODERACION:localhost:9096}") String destino) {
+    return CanalGrpc.hacia(destino);
+  }
+
+  @Bean
+  ModeracionGrpc.ModeracionBlockingStub moderacionGrpc(ManagedChannel canalModeracion) {
+    return ModeracionGrpc.newBlockingStub(canalModeracion);
   }
 
   /** Recibe de Redis los eventos de todas las personas y los reparte a los streams abiertos aquí. */
