@@ -101,10 +101,22 @@ services:
     environment:
       <<: *entorno
       REDIS_HOST: redis
+      GRPC_MODERACION: moderacion:9096
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+
+  moderacion:
+    build:
+      <<: *construccion
+      args:
+        MODULO: servicios/moderacion
+    environment:
+      <<: *entorno
+    depends_on:
+      postgres:
         condition: service_healthy
 
   orquestador:
@@ -119,6 +131,7 @@ services:
       GRPC_PERFILES: perfiles:9092
       GRPC_COMPATIBILIDAD: compatibilidad:9093
       GRPC_CHAT: chat:9095
+      GRPC_MODERACION: moderacion:9096
     ports:
       - "3001:3001"
     depends_on:
@@ -131,6 +144,8 @@ services:
       compatibilidad:
         condition: service_started
       chat:
+        condition: service_started
+      moderacion:
         condition: service_started
 
 volumes:
