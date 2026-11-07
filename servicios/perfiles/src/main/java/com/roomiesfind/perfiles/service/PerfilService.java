@@ -1,8 +1,11 @@
 package com.roomiesfind.perfiles.service;
 
 import com.roomiesfind.comun.ErrorNegocio;
+import com.roomiesfind.perfiles.dto.CandidatoDto;
 import com.roomiesfind.perfiles.dto.DatosPerfilDto;
+import com.roomiesfind.perfiles.dto.FiltrosCandidatosDto;
 import com.roomiesfind.perfiles.dto.FotoDto;
+import com.roomiesfind.perfiles.dto.PaginaCandidatosDto;
 import com.roomiesfind.perfiles.dto.PerfilDto;
 import com.roomiesfind.perfiles.model.Perfil;
 import com.roomiesfind.perfiles.repository.FotoRepository;
@@ -82,6 +85,15 @@ public class PerfilService {
 
   public List<PerfilDto> candidatos(int excluirUsuarioId) {
     return perfiles.listarExcepto(excluirUsuarioId).stream().map(PerfilService::aDto).toList();
+  }
+
+  public PaginaCandidatosDto buscarCandidatos(FiltrosCandidatosDto filtros) {
+    PerfilRepository.Conteos conteos = perfiles.contarCandidatos(filtros);
+    List<CandidatoDto> candidatos = perfiles.buscarCandidatos(filtros).stream()
+        .map((encontrado) -> new CandidatoDto(aDto(encontrado.perfil()), encontrado.puntaje()))
+        .toList();
+    return new PaginaCandidatosDto(candidatos, conteos.total(), conteos.muyBien(), conteos.buena(),
+        conteos.conversar(), conteos.distintos());
   }
 
   public FotoDto obtenerFoto(int usuarioId) {

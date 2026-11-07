@@ -2,7 +2,9 @@ package com.roomiesfind.perfiles.controller;
 
 import com.roomiesfind.comun.ErrorNegocio;
 import com.roomiesfind.perfiles.dto.DatosPerfilDto;
+import com.roomiesfind.perfiles.dto.FiltrosCandidatosDto;
 import com.roomiesfind.perfiles.dto.FotoDto;
+import com.roomiesfind.perfiles.dto.PaginaCandidatosDto;
 import com.roomiesfind.perfiles.dto.PerfilDto;
 import com.roomiesfind.perfiles.service.PerfilService;
 import java.util.List;
@@ -58,6 +60,10 @@ public class PerfilController {
 
   public List<PerfilDto> candidatos(int excluirUsuarioId) {
     return perfiles.candidatos(excluirUsuarioId);
+  }
+
+  public PaginaCandidatosDto buscarCandidatos(FiltrosCandidatosDto filtros) {
+    return perfiles.buscarCandidatos(ReglasBusqueda.normalizar(filtros));
   }
 
   public FotoDto obtenerFoto(int usuarioId) {
