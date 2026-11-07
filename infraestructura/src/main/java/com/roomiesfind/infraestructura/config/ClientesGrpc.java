@@ -2,6 +2,7 @@ package com.roomiesfind.infraestructura.config;
 
 import com.roomiesfind.contratos.chat.ChatGrpc;
 import com.roomiesfind.contratos.compatibilidad.CompatibilidadGrpc;
+import com.roomiesfind.contratos.moderacion.ModeracionGrpc;
 import com.roomiesfind.contratos.perfiles.PerfilesGrpc;
 import com.roomiesfind.contratos.usuarios.UsuariosGrpc;
 import io.grpc.Channel;
@@ -22,13 +23,15 @@ public class ClientesGrpc {
   private final CompatibilidadGrpc.CompatibilidadBlockingStub compatibilidad;
   private final ChatGrpc.ChatBlockingStub chat;
   private final ChatGrpc.ChatStub chatEnVivo;
+  private final ModeracionGrpc.ModeracionBlockingStub moderacion;
 
-  public ClientesGrpc(Channel usuarios, Channel perfiles, Channel compatibilidad, Channel chat) {
+  public ClientesGrpc(Channel usuarios, Channel perfiles, Channel compatibilidad, Channel chat, Channel moderacion) {
     this.usuarios = UsuariosGrpc.newBlockingStub(usuarios).withWaitForReady();
     this.perfiles = PerfilesGrpc.newBlockingStub(perfiles).withWaitForReady();
     this.compatibilidad = CompatibilidadGrpc.newBlockingStub(compatibilidad).withWaitForReady();
     this.chat = ChatGrpc.newBlockingStub(chat).withWaitForReady();
     this.chatEnVivo = ChatGrpc.newStub(chat);
+    this.moderacion = ModeracionGrpc.newBlockingStub(moderacion).withWaitForReady();
   }
 
   public UsuariosGrpc.UsuariosBlockingStub usuarios() {
@@ -41,6 +44,10 @@ public class ClientesGrpc {
 
   public ChatGrpc.ChatBlockingStub chat() {
     return chat.withDeadlineAfter(ESPERA_SEGUNDOS, TimeUnit.SECONDS);
+  }
+
+  public ModeracionGrpc.ModeracionBlockingStub moderacion() {
+    return moderacion.withDeadlineAfter(ESPERA_SEGUNDOS, TimeUnit.SECONDS);
   }
 
   /** Sin tiempo límite: el stream de eventos dura lo que dure la conexión. */

@@ -30,8 +30,14 @@ public class ClientesGrpcConfig {
     return CanalGrpc.hacia(destino);
   }
 
+  @Bean(destroyMethod = "shutdown")
+  ManagedChannel canalModeracion(@Value("${GRPC_MODERACION:localhost:9096}") String destino) {
+    return CanalGrpc.hacia(destino);
+  }
+
   @Bean
-  ClientesGrpc clientesGrpc(ManagedChannel canalUsuarios, ManagedChannel canalPerfiles, ManagedChannel canalCompatibilidad, ManagedChannel canalChat) {
-    return new ClientesGrpc(canalUsuarios, canalPerfiles, canalCompatibilidad, canalChat);
+  ClientesGrpc clientesGrpc(ManagedChannel canalUsuarios, ManagedChannel canalPerfiles, ManagedChannel canalCompatibilidad,
+      ManagedChannel canalChat, ManagedChannel canalModeracion) {
+    return new ClientesGrpc(canalUsuarios, canalPerfiles, canalCompatibilidad, canalChat, canalModeracion);
   }
 }

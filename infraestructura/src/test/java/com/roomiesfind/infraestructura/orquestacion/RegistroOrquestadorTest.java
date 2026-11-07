@@ -84,7 +84,7 @@ class RegistroOrquestadorTest {
         })
         .build().start();
     canal = InProcessChannelBuilder.forName(nombre).directExecutor().build();
-    orquestador = new RegistroOrquestador(new ClientesGrpc(canal, canal, canal, canal));
+    orquestador = new RegistroOrquestador(new ClientesGrpc(canal, canal, canal, canal, canal));
   }
 
   @AfterEach
