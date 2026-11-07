@@ -17,6 +17,8 @@ service Perfiles {
   rpc ObtenerPerfiles(ObtenerPerfilesRequest) returns (ObtenerPerfilesResponse);
   rpc ActualizarPerfil(ActualizarPerfilRequest) returns (Perfil);
   rpc ListarCandidatos(ListarCandidatosRequest) returns (ListarCandidatosResponse);
+  // Una página de personas, ya filtrada y ordenada. Aquí se calcula el puntaje para poder ordenar por él.
+  rpc BuscarCandidatos(BuscarCandidatosRequest) returns (BuscarCandidatosResponse);
   rpc ObtenerFoto(ObtenerFotoRequest) returns (Foto);
   rpc GuardarFoto(GuardarFotoRequest) returns (GuardarFotoResponse);
 }
@@ -90,6 +92,38 @@ message ListarCandidatosRequest {
 
 message ListarCandidatosResponse {
   repeated Perfil perfiles = 1;
+}
+
+message BuscarCandidatosRequest {
+  int32 usuario_id = 1;
+  repeated int32 excluir_ids = 2;
+  int32 pagina = 3;
+  int32 tamano = 4;
+  string orden = 5;
+  repeated string zonas = 6;
+  optional string horario = 7;
+  optional int32 presupuesto_maximo = 8;
+  optional string mascotas = 9;
+  optional int32 puntaje_minimo = 10;
+}
+
+message CandidatoPuntuado {
+  Perfil perfil = 1;
+  int32 puntaje = 2;
+}
+
+// Cuántas personas hay en cada nivel, de todas las páginas.
+message ResumenNiveles {
+  int32 muy_bien = 1;
+  int32 buena = 2;
+  int32 conversar = 3;
+  int32 distintos = 4;
+}
+
+message BuscarCandidatosResponse {
+  repeated CandidatoPuntuado candidatos = 1;
+  int32 total = 2;
+  ResumenNiveles resumen = 3;
 }
 
 message ObtenerFotoRequest {
