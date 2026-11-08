@@ -1,6 +1,9 @@
 package com.roomiesfind.moderacion.controller;
 
+import com.roomiesfind.moderacion.dto.CuentaReportadaDto;
 import com.roomiesfind.moderacion.dto.NuevoReporteDto;
+import com.roomiesfind.moderacion.dto.ResumenDto;
+import com.roomiesfind.moderacion.model.Suspension;
 import com.roomiesfind.moderacion.service.ModeracionService;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -44,5 +47,35 @@ public class ModeracionController {
 
   public List<Integer> cuentasConAlerta(List<Integer> ids) {
     return moderacion.cuentasConAlerta(ids);
+  }
+
+  public ResumenDto resumen() {
+    return moderacion.resumen();
+  }
+
+  public List<CuentaReportadaDto> cuentasReportadas(boolean soloPendientes) {
+    return moderacion.cuentasReportadas(soloPendientes);
+  }
+
+  public void resolver(int adminId, int usuarioId, String decision) {
+    ReglasModeracion.validarPareja(adminId, usuarioId, "No puedes revisar reportes sobre tu propia cuenta.");
+    ReglasModeracion.validarDecision(decision);
+    moderacion.resolver(adminId, usuarioId, decision);
+  }
+
+  public void suspender(int adminId, int usuarioId, String motivo) {
+    moderacion.suspender(adminId, usuarioId, ReglasModeracion.validarMotivoSuspension(adminId, usuarioId, motivo));
+  }
+
+  public void reactivar(int usuarioId) {
+    moderacion.reactivar(usuarioId);
+  }
+
+  public List<Suspension> suspendidas() {
+    return moderacion.suspendidas();
+  }
+
+  public boolean estaSuspendida(int usuarioId) {
+    return moderacion.estaSuspendida(usuarioId);
   }
 }

@@ -16,6 +16,20 @@ final class ReglasModeracion {
     if (usuarioId == otroId) throw ErrorNegocio.solicitudInvalida(mensajeMismaCuenta);
   }
 
+  static String validarMotivoSuspension(int adminId, int usuarioId, String motivo) {
+    validarPareja(adminId, usuarioId, "No puedes suspender tu propia cuenta.");
+    String texto = motivo == null ? "" : motivo.strip();
+    if (texto.isEmpty()) throw ErrorNegocio.solicitudInvalida("Escribe el motivo de la suspensión.");
+    if (texto.length() > DETALLE_MAXIMO) throw ErrorNegocio.solicitudInvalida("El motivo puede tener máximo 500 caracteres.");
+    return texto;
+  }
+
+  static void validarDecision(String decision) {
+    if (!"descartar".equals(decision) && !"mantener".equals(decision)) {
+      throw ErrorNegocio.solicitudInvalida("La decisión no es válida.");
+    }
+  }
+
   static NuevoReporteDto validarReporte(NuevoReporteDto reporte) {
     validarPareja(reporte.reportanteId(), reporte.reportadoId(), "No puedes reportar tu propia cuenta.");
     if (!MotivoReporte.existe(reporte.motivo())) throw ErrorNegocio.solicitudInvalida("Elige un motivo de la lista.");

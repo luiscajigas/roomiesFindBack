@@ -35,6 +35,24 @@ class ReglasModeracionTest {
   }
 
   @Test
+  void laSuspensionExigeMotivoYNoAplicaALaPropiaCuenta() {
+    assertEquals("No puedes suspender tu propia cuenta.",
+        assertThrows(ErrorNegocio.class, () -> ReglasModeracion.validarMotivoSuspension(1, 1, "x")).getMessage());
+    assertEquals("Escribe el motivo de la suspensión.",
+        assertThrows(ErrorNegocio.class, () -> ReglasModeracion.validarMotivoSuspension(1, 2, "  ")).getMessage());
+    assertThrows(ErrorNegocio.class, () -> ReglasModeracion.validarMotivoSuspension(1, 2, "x".repeat(501)));
+    assertEquals("Estafa confirmada", ReglasModeracion.validarMotivoSuspension(1, 2, " Estafa confirmada "));
+  }
+
+  @Test
+  void soloAceptaDecisionesConocidas() {
+    ReglasModeracion.validarDecision("descartar");
+    ReglasModeracion.validarDecision("mantener");
+    assertThrows(ErrorNegocio.class, () -> ReglasModeracion.validarDecision("borrar"));
+    assertThrows(ErrorNegocio.class, () -> ReglasModeracion.validarDecision(null));
+  }
+
+  @Test
   void limpiaElDetalle() {
     assertEquals("hola", ReglasModeracion.validarReporte(new NuevoReporteDto(1, 2, "estafa", "  hola ")).detalle());
     assertNull(ReglasModeracion.validarReporte(new NuevoReporteDto(1, 2, "estafa", "  ")).detalle());
