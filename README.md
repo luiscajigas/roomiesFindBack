@@ -44,7 +44,7 @@ Ningún microservicio expone HTTP y ningún módulo llama a otro por REST. El ú
 | `servicios/compatibilidad` | Historial de puntajes y explicaciones guardadas | `recomendaciones`, `explicaciones_ia` | 9093 |
 | `servicios/ia` | Redacta explicaciones con Claude y Gemini de respaldo | | 9094 |
 | `servicios/chat` | Conversaciones y mensajes en tiempo real, con Redis | `conversaciones`, `mensajes` | 9095 |
-| `servicios/moderacion` | Bloqueos, reportes y alertas de cuentas muy reportadas | `bloqueos`, `reportes`, `alertas_cuenta` | 9096 |
+| `servicios/moderacion` | Bloqueos, reportes, alertas y suspensiones | `bloqueos`, `reportes`, `alertas_cuenta`, `suspensiones` | 9096 |
 | `infraestructura` | Orquestador: puerta de entrada, registro, tablas y Docker | crea el esquema | HTTP 3001 |
 
 Cada servicio solo consulta sus propias tablas. Si necesita datos de otro, los pide por gRPC.
@@ -98,6 +98,17 @@ El orquestador no conoce Redis: solo habla con `servicios/chat` por gRPC. Si Red
 - **Bloquear** funciona en los dos sentidos: ninguna de las dos personas ve a la otra en las búsquedas ni en el chat. `servicios/chat` lo consulta por gRPC antes de entregar un mensaje, así que no se puede saltar desde el navegador. Al desbloquear, la conversación vuelve con su historial.
 - **Reportar**: cada persona puede reportar a la misma cuenta una sola vez y máximo 10 cuentas al día.
 - **Alerta**: con 3 reportes de personas distintas, la cuenta muestra un aviso en su tarjeta y en el chat, y quienes ya conversan con ella reciben un aviso en vivo. El aviso es prudente porque un reporte no prueba nada. No oculta la cuenta ni dice quién reportó.
+
+## Panel de administración
+
+Quien tiene `rol = 'admin'` en la tabla `usuarios` ve el panel en `/admin`. Al arrancar, el orquestador marca como administradores los correos de la variable `ADMINISTRADORES` (separados por comas). El permiso se revisa en el servidor en cada petición (`@RequiereAdmin`), no solo en el frontend.
+
+- **Revisar reportes** de cada cuenta, con motivo, detalle y quién reportó.
+- **Descartar**: los reportes dejan de contar y se quita la alerta.
+- **Mantener el aviso**: los reportes quedan revisados y la alerta sigue.
+- **Suspender** con un motivo: la persona no puede iniciar sesión, se cierra su chat y desaparece de búsquedas y conversaciones. Se puede reactivar. No se puede suspender a otro administrador ni a uno mismo.
+
+Todo queda guardado: `reportes.estado`, `revisado_por` y `revisado_en`, y la tabla `suspensiones`.
 
 ## Búsqueda de compañeros
 
