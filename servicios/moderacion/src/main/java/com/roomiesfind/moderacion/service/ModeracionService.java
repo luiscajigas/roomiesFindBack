@@ -112,7 +112,7 @@ public class ModeracionService {
   public void resolver(int adminId, int usuarioId, String decision) {
     reportes.esperarTurno(usuarioId);
     if ("descartar".equals(decision)) {
-      if (reportes.marcar(usuarioId, "descartado", "descartado", adminId) == 0) throw sinReportes();
+      if (reportes.marcar(usuarioId, "cualquiera", "descartado", adminId) == 0) throw sinReportes();
       alertas.quitar(usuarioId);
     } else if (reportes.marcar(usuarioId, "pendiente", "revisado", adminId) == 0) {
       throw sinReportes();

@@ -55,7 +55,8 @@ public class ReporteRepository {
         FILA, soloPendientes, CUENTAS_MAXIMAS);
   }
 
-  /** @return cuántos reportes cambiaron */
+  /** @param desde un estado, o "cualquiera" para todos los que no estén ya en el nuevo estado
+   * @return cuántos reportes cambiaron */
   public int marcar(int reportadoId, String desde, String estado, int adminId) {
     return jdbc.update(
         """
