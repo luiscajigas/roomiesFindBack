@@ -108,6 +108,30 @@ public class ConsultaPerfiles {
         .toList();
   }
 
+  /**
+   * Nombre, correo, rol y foto de cada persona, para el panel de administración.
+   * Incluye a quien no tiene perfil o está suspendido; las cuentas borradas no vienen.
+   */
+  public Map<Integer, Map<String, Object>> fichas(List<Integer> ids) {
+    if (ids.isEmpty()) return Map.of();
+    Map<Integer, Perfil> perfiles = clientes.perfiles()
+        .obtenerPerfiles(ObtenerPerfilesRequest.newBuilder().addAllUsuarioIds(ids).build())
+        .getPerfilesList().stream()
+        .collect(Collectors.toMap(Perfil::getUsuarioId, Function.identity()));
+    Map<Integer, Map<String, Object>> fichas = new LinkedHashMap<>();
+    usuarios(ids).forEach((id, usuario) -> {
+      Map<String, Object> ficha = new LinkedHashMap<>();
+      ficha.put("id", id);
+      ficha.put("nombre", usuario.getNombre());
+      ficha.put("email", usuario.getEmail());
+      ficha.put("rol", usuario.getRol().isEmpty() ? "usuario" : usuario.getRol());
+      Perfil perfil = perfiles.get(id);
+      ficha.put("foto_url", perfil != null && perfil.hasFotoUrl() ? perfil.getFotoUrl() : null);
+      fichas.put(id, ficha);
+    });
+    return fichas;
+  }
+
   private Set<Integer> conAlerta(List<Integer> ids) {
     if (ids.isEmpty()) return Set.of();
     return Set.copyOf(clientes.moderacion()
