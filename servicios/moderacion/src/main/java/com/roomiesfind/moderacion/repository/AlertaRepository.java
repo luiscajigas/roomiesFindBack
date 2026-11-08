@@ -20,6 +20,14 @@ public class AlertaRepository {
     return jdbc.update("INSERT INTO alertas_cuenta (usuario_id) VALUES (?) ON CONFLICT DO NOTHING", usuarioId) > 0;
   }
 
+  public void quitar(int usuarioId) {
+    jdbc.update("DELETE FROM alertas_cuenta WHERE usuario_id = ?", usuarioId);
+  }
+
+  public int contar() {
+    return jdbc.queryForObject("SELECT count(*) FROM alertas_cuenta", Integer.class);
+  }
+
   public List<Integer> deEntre(List<Integer> ids) {
     String marcadores = String.join(", ", Collections.nCopies(ids.size(), "?"));
     return jdbc.queryForList(
