@@ -13,6 +13,8 @@ service Usuarios {
   rpc Autenticar(AutenticarRequest) returns (SesionResponse);
   rpc ValidarToken(ValidarTokenRequest) returns (ValidarTokenResponse);
   rpc ObtenerUsuarios(ObtenerUsuariosRequest) returns (ObtenerUsuariosResponse);
+  // Las cuentas de administración no buscan compañero: no se muestran a los demás.
+  rpc ListarAdministradores(google.protobuf.Empty) returns (ObtenerUsuariosResponse);
   // Compensación: deshace una cuenta si el registro falla en un paso posterior.
   rpc EliminarUsuario(EliminarUsuarioRequest) returns (google.protobuf.Empty);
 }
