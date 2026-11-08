@@ -1,5 +1,6 @@
 package com.roomiesfind.infraestructura.orquestacion;
 
+import com.google.protobuf.Empty;
 import com.roomiesfind.contratos.moderacion.CuentasRequest;
 import com.roomiesfind.contratos.moderacion.UsuarioRequest;
 import com.roomiesfind.contratos.perfiles.BuscarCandidatosRequest;
@@ -11,6 +12,7 @@ import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.contratos.usuarios.ObtenerUsuariosRequest;
 import com.roomiesfind.contratos.usuarios.Usuario;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,11 +76,19 @@ public class ConsultaPerfiles {
     return respuesta;
   }
 
-  /** Quien bloqueó o fue bloqueado no aparece en ninguna parte para la otra persona. */
+  /**
+   * A quién no se le muestra a esta persona: quien bloqueó o fue bloqueado, las cuentas
+   * suspendidas y las de administración, que no buscan compañero.
+   */
   public Set<Integer> excluidos(int usuarioId) {
-    return Set.copyOf(clientes.moderacion()
+    Set<Integer> excluidos = new HashSet<>(clientes.moderacion()
         .listarExcluidos(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build())
         .getIdsList());
+    clientes.usuarios().listarAdministradores(Empty.getDefaultInstance()).getUsuariosList().stream()
+        .map(Usuario::getId)
+        .filter((id) -> id != usuarioId)
+        .forEach(excluidos::add);
+    return Set.copyOf(excluidos);
   }
 
   /** Solo las personas pedidas, para no traer a todos los usuarios cuando no hace falta. */
