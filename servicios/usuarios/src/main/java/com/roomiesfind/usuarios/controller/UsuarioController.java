@@ -47,6 +47,10 @@ public class UsuarioController {
     return usuarios.obtener(ids);
   }
 
+  public List<UsuarioDto> administradores() {
+    return usuarios.administradores();
+  }
+
   public void eliminar(int id) {
     usuarios.eliminar(id);
   }

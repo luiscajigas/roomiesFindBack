@@ -60,6 +60,13 @@ public class UsuariosApi extends UsuariosGrpc.UsuariosImplBase {
   }
 
   @Override
+  public void listarAdministradores(Empty request, StreamObserver<ObtenerUsuariosResponse> observador) {
+    RespuestaGrpc.responder(observador, () -> ObtenerUsuariosResponse.newBuilder()
+        .addAllUsuarios(controller.administradores().stream().map(UsuariosApi::aUsuario).toList())
+        .build());
+  }
+
+  @Override
   public void eliminarUsuario(EliminarUsuarioRequest request, StreamObserver<Empty> observador) {
     RespuestaGrpc.responder(observador, () -> {
       controller.eliminar(request.getId());

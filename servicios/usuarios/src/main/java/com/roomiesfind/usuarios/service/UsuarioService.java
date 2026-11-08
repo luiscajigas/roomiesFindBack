@@ -49,6 +49,10 @@ public class UsuarioService {
     return repositorio.buscarPorIds(ids).stream().map(UsuarioService::aDto).toList();
   }
 
+  public List<UsuarioDto> administradores() {
+    return repositorio.buscarAdministradores().stream().map(UsuarioService::aDto).toList();
+  }
+
   public void eliminar(int id) {
     repositorio.eliminar(id);
   }

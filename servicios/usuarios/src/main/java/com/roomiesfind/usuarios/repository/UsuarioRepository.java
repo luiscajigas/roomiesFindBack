@@ -39,6 +39,10 @@ public class UsuarioRepository {
     return jdbc.query("SELECT * FROM usuarios WHERE id IN (:ids)", new MapSqlParameterSource("ids", ids), FILA);
   }
 
+  public List<Usuario> buscarAdministradores() {
+    return jdbc.query("SELECT * FROM usuarios WHERE rol = 'admin' ORDER BY id", FILA);
+  }
+
   public void eliminar(int id) {
     jdbc.update("DELETE FROM usuarios WHERE id = :id", new MapSqlParameterSource("id", id));
   }
