@@ -4,13 +4,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.roomiesfind.contratos.perfiles.DatosPerfil;
 import com.roomiesfind.contratos.perfiles.Foto;
 import com.roomiesfind.contratos.usuarios.AutenticarRequest;
+import com.roomiesfind.contratos.usuarios.ObtenerUsuariosRequest;
 import com.roomiesfind.contratos.usuarios.SesionResponse;
+import com.roomiesfind.contratos.usuarios.Usuario;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
 import com.roomiesfind.infraestructura.orquestacion.RegistroOrquestador;
+import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
+import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
+import com.roomiesfind.infraestructura.seguridad.Suspensiones;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,10 +32,12 @@ public class AuthRest {
 
   private final RegistroOrquestador registro;
   private final ClientesGrpc clientes;
+  private final Suspensiones suspensiones;
 
-  public AuthRest(RegistroOrquestador registro, ClientesGrpc clientes) {
+  public AuthRest(RegistroOrquestador registro, ClientesGrpc clientes, Suspensiones suspensiones) {
     this.registro = registro;
     this.clientes = clientes;
+    this.suspensiones = suspensiones;
   }
 
   @PostMapping("/registro")
@@ -61,21 +70,41 @@ public class AuthRest {
   @PostMapping("/login")
   Map<String, Object> login(@RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
-    return aRespuesta(clientes.usuarios().autenticar(AutenticarRequest.newBuilder()
+    SesionResponse sesion = clientes.usuarios().autenticar(AutenticarRequest.newBuilder()
         .setEmail(datos.path("email").asText(""))
         .setPassword(datos.path("password").asText(""))
-        .build()));
+        .build());
+    // Se comprueba después de la contraseña, para no revelar qué correos están suspendidos.
+    if (suspensiones.estaSuspendida(sesion.getUsuario().getId())) {
+      throw new ErrorRest(HttpStatus.FORBIDDEN, AutenticacionInterceptor.CUENTA_SUSPENDIDA);
+    }
+    return aRespuesta(sesion);
+  }
+
+  /** Datos actuales de quien tiene la sesión, para que el frontend sepa su rol aunque haya cambiado. */
+  @RequiereAuth
+  @GetMapping("/sesion")
+  Map<String, Object> sesion(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
+    Usuario usuario = clientes.usuarios()
+        .obtenerUsuarios(ObtenerUsuariosRequest.newBuilder().addIds(usuarioId).build())
+        .getUsuariosList().stream().findFirst()
+        .orElseThrow(() -> new ErrorRest(HttpStatus.UNAUTHORIZED, "No autenticado."));
+    return aUsuario(usuario);
   }
 
   private static Map<String, Object> aRespuesta(SesionResponse sesion) {
-    Map<String, Object> usuario = new LinkedHashMap<>();
-    usuario.put("id", sesion.getUsuario().getId());
-    usuario.put("nombre", sesion.getUsuario().getNombre());
-    usuario.put("email", sesion.getUsuario().getEmail());
-
     Map<String, Object> respuesta = new LinkedHashMap<>();
     respuesta.put("token", sesion.getToken());
-    respuesta.put("usuario", usuario);
+    respuesta.put("usuario", aUsuario(sesion.getUsuario()));
     return respuesta;
+  }
+
+  private static Map<String, Object> aUsuario(Usuario usuario) {
+    Map<String, Object> datos = new LinkedHashMap<>();
+    datos.put("id", usuario.getId());
+    datos.put("nombre", usuario.getNombre());
+    datos.put("email", usuario.getEmail());
+    datos.put("rol", usuario.getRol().isEmpty() ? "usuario" : usuario.getRol());
+    return datos;
   }
 }
