@@ -72,6 +72,11 @@ public class UsuariosApi extends UsuariosGrpc.UsuariosImplBase {
   }
 
   private static Usuario aUsuario(UsuarioDto usuario) {
-    return Usuario.newBuilder().setId(usuario.id()).setNombre(usuario.nombre()).setEmail(usuario.email()).build();
+    return Usuario.newBuilder()
+        .setId(usuario.id())
+        .setNombre(usuario.nombre())
+        .setEmail(usuario.email())
+        .setRol(usuario.rol() == null ? "usuario" : usuario.rol())
+        .build();
   }
 }

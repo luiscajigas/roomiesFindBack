@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 public class UsuarioRepository {
 
   private static final RowMapper<Usuario> FILA = (fila, numero) -> new Usuario(
-      fila.getInt("id"), fila.getString("nombre"), fila.getString("email"), fila.getString("password_hash"));
+      fila.getInt("id"), fila.getString("nombre"), fila.getString("email"), fila.getString("password_hash"), fila.getString("rol"));
 
   private final NamedParameterJdbcTemplate jdbc;
 

@@ -73,6 +73,6 @@ public class UsuarioService {
   }
 
   private static UsuarioDto aDto(Usuario usuario) {
-    return new UsuarioDto(usuario.id(), usuario.nombre(), usuario.email());
+    return new UsuarioDto(usuario.id(), usuario.nombre(), usuario.email(), usuario.rol());
   }
 }
