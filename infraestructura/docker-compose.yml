@@ -127,6 +127,7 @@ services:
     environment:
       <<: *entorno
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4300}
+      ADMINISTRADORES: ${ADMINISTRADORES:-}
       GRPC_USUARIOS: usuarios:9091
       GRPC_PERFILES: perfiles:9092
       GRPC_COMPATIBILIDAD: compatibilidad:9093
