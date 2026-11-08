@@ -10,6 +10,7 @@ import com.roomiesfind.contratos.chat.Mensaje;
 import com.roomiesfind.contratos.chat.NotificarEscribiendoRequest;
 import com.roomiesfind.contratos.usuarios.ValidarTokenRequest;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.seguridad.Suspensiones;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCallStreamObserver;
@@ -47,6 +48,7 @@ public class ChatWebSocket extends TextWebSocketHandler {
 
   private final ClientesGrpc clientes;
   private final ObjectMapper json;
+  private final Suspensiones suspensiones;
   private final Map<String, ConexionChat> conexiones = new ConcurrentHashMap<>();
   private final ScheduledExecutorService temporizador = Executors.newSingleThreadScheduledExecutor((tarea) -> {
     Thread hilo = new Thread(tarea, "chat-autenticacion");
@@ -54,9 +56,17 @@ public class ChatWebSocket extends TextWebSocketHandler {
     return hilo;
   });
 
-  public ChatWebSocket(ClientesGrpc clientes, ObjectMapper json) {
+  public ChatWebSocket(ClientesGrpc clientes, ObjectMapper json, Suspensiones suspensiones) {
     this.clientes = clientes;
     this.json = json;
+    this.suspensiones = suspensiones;
+  }
+
+  /** Cierra todas las conexiones de una persona, por ejemplo al suspender su cuenta. */
+  public void cerrarConexionesDe(int usuarioId) {
+    conexiones.values().stream()
+        .filter((conexion) -> Integer.valueOf(usuarioId).equals(conexion.usuarioId))
+        .forEach((conexion) -> cerrar(conexion, CloseStatus.POLICY_VIOLATION));
   }
 
   @Override
@@ -115,6 +125,10 @@ public class ChatWebSocket extends TextWebSocketHandler {
           .validarToken(ValidarTokenRequest.newBuilder().setToken(token).build())
           .getUsuarioId();
     } catch (StatusRuntimeException error) {
+      cerrar(conexion, CloseStatus.POLICY_VIOLATION);
+      return;
+    }
+    if (suspensiones.estaSuspendida(conexion.usuarioId)) {
       cerrar(conexion, CloseStatus.POLICY_VIOLATION);
       return;
     }
