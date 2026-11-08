@@ -139,6 +139,39 @@ CREATE TABLE IF NOT EXISTS alertas_cuenta (
   activada_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Administración: quién puede entrar al panel, cómo quedó cada reporte y qué cuentas están suspendidas.
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS rol VARCHAR(20) NOT NULL DEFAULT 'usuario';
+
+ALTER TABLE usuarios
+  DROP CONSTRAINT IF EXISTS usuarios_rol_check;
+
+ALTER TABLE usuarios
+  ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('usuario','admin'));
+
+ALTER TABLE reportes
+  ADD COLUMN IF NOT EXISTS estado VARCHAR(20) NOT NULL DEFAULT 'pendiente';
+
+ALTER TABLE reportes
+  DROP CONSTRAINT IF EXISTS reportes_estado_check;
+
+ALTER TABLE reportes
+  ADD CONSTRAINT reportes_estado_check CHECK (estado IN ('pendiente','revisado','descartado'));
+
+ALTER TABLE reportes
+  ADD COLUMN IF NOT EXISTS revisado_en TIMESTAMPTZ;
+
+ALTER TABLE reportes
+  ADD COLUMN IF NOT EXISTS revisado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS suspensiones (
+  usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+  motivo TEXT NOT NULL CHECK (char_length(motivo) BETWEEN 1 AND 500),
+  suspendida_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  creada_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reportes_estado ON reportes(estado, reportado_id);
 CREATE INDEX IF NOT EXISTS idx_bloqueos_bloqueado ON bloqueos(bloqueado_id);
 CREATE INDEX IF NOT EXISTS idx_reportes_reportado ON reportes(reportado_id);
 CREATE INDEX IF NOT EXISTS idx_reportes_reportante ON reportes(reportante_id, creado_en);
