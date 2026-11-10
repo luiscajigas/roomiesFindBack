@@ -5,6 +5,8 @@ import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +25,11 @@ public class ServidorGrpc implements SmartLifecycle {
 
   private final int puerto;
   private final BindableService api;
+  /**
+   * Cada llamada se atiende en un hilo virtual. Las llamadas esperan casi siempre a la base
+   * de datos o a otro servicio, y así no hace falta calcular el tamaño de un pool de hilos.
+   */
+  private final ExecutorService hilos = Executors.newVirtualThreadPerTaskExecutor();
   private Server servidor;
 
   public ServidorGrpc(int puerto, BindableService api) {
@@ -36,6 +43,7 @@ public class ServidorGrpc implements SmartLifecycle {
       servidor = NettyServerBuilder.forPort(puerto)
           .maxInboundMessageSize(TAMANO_MAXIMO_MENSAJE)
           .addService(api)
+          .executor(hilos)
           .build()
           .start();
     } catch (IOException error) {
@@ -67,6 +75,7 @@ public class ServidorGrpc implements SmartLifecycle {
       Thread.currentThread().interrupt();
     }
     servidor.shutdownNow();
+    hilos.close();
   }
 
   @Override
