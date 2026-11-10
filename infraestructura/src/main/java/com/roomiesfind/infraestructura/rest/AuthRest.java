@@ -8,11 +8,12 @@ import com.roomiesfind.contratos.usuarios.ObtenerUsuariosRequest;
 import com.roomiesfind.contratos.usuarios.SesionResponse;
 import com.roomiesfind.contratos.usuarios.Usuario;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.AuthRespuestas.SesionRespuesta;
+import com.roomiesfind.infraestructura.contrato.AuthRespuestas.UsuarioSesion;
 import com.roomiesfind.infraestructura.orquestacion.RegistroOrquestador;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
 import com.roomiesfind.infraestructura.seguridad.Suspensiones;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +43,7 @@ public class AuthRest {
 
   @PostMapping("/registro")
   @ResponseStatus(HttpStatus.CREATED)
-  Map<String, Object> registrar(@RequestParam Map<String, String> campos,
+  SesionRespuesta registrar(@RequestParam Map<String, String> campos,
       @RequestParam(value = "foto", required = false) MultipartFile archivo) {
     for (String obligatorio : new String[] {"nombre", "email", "password", "presupuesto", "zona", "horario"}) {
       String valor = campos.get(obligatorio);
@@ -64,11 +65,11 @@ public class AuthRest {
     Foto foto = archivo == null || archivo.isEmpty() ? null : Archivos.aFoto(archivo);
     SesionResponse sesion = registro.registrar(
         campos.get("nombre"), campos.get("email"), campos.get("password"), datos.build(), foto);
-    return aRespuesta(sesion);
+    return SesionRespuesta.de(sesion);
   }
 
   @PostMapping("/login")
-  Map<String, Object> login(@RequestBody(required = false) JsonNode cuerpo) {
+  SesionRespuesta login(@RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
     SesionResponse sesion = clientes.usuarios().autenticar(AutenticarRequest.newBuilder()
         .setEmail(datos.path("email").asText(""))
@@ -78,33 +79,18 @@ public class AuthRest {
     if (suspensiones.estaSuspendida(sesion.getUsuario().getId())) {
       throw new ErrorRest(HttpStatus.FORBIDDEN, AutenticacionInterceptor.CUENTA_SUSPENDIDA);
     }
-    return aRespuesta(sesion);
+    return SesionRespuesta.de(sesion);
   }
 
   /** Datos actuales de quien tiene la sesión, para que el frontend sepa su rol aunque haya cambiado. */
   @RequiereAuth
   @GetMapping("/sesion")
-  Map<String, Object> sesion(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
+  UsuarioSesion sesion(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
     Usuario usuario = clientes.usuarios()
         .obtenerUsuarios(ObtenerUsuariosRequest.newBuilder().addIds(usuarioId).build())
         .getUsuariosList().stream().findFirst()
         .orElseThrow(() -> new ErrorRest(HttpStatus.UNAUTHORIZED, "No autenticado."));
-    return aUsuario(usuario);
+    return UsuarioSesion.de(usuario);
   }
 
-  private static Map<String, Object> aRespuesta(SesionResponse sesion) {
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("token", sesion.getToken());
-    respuesta.put("usuario", aUsuario(sesion.getUsuario()));
-    return respuesta;
-  }
-
-  private static Map<String, Object> aUsuario(Usuario usuario) {
-    Map<String, Object> datos = new LinkedHashMap<>();
-    datos.put("id", usuario.getId());
-    datos.put("nombre", usuario.getNombre());
-    datos.put("email", usuario.getEmail());
-    datos.put("rol", usuario.getRol().isEmpty() ? "usuario" : usuario.getRol());
-    return datos;
-  }
 }
