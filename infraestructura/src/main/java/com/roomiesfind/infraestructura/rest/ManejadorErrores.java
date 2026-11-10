@@ -1,8 +1,8 @@
 package com.roomiesfind.infraestructura.rest;
 
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.ErrorRespuesta;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -24,7 +24,7 @@ public class ManejadorErrores {
   private static final String SERVICIO_NO_DISPONIBLE = "Un servicio no está disponible. Inténtalo de nuevo en unos segundos.";
 
   @ExceptionHandler(StatusRuntimeException.class)
-  ResponseEntity<Map<String, String>> errorGrpc(StatusRuntimeException error) {
+  ResponseEntity<ErrorRespuesta> errorGrpc(StatusRuntimeException error) {
     Status status = error.getStatus();
     String mensaje = status.getDescription();
     return switch (status.getCode()) {
@@ -45,37 +45,37 @@ public class ManejadorErrores {
   }
 
   @ExceptionHandler(ErrorRest.class)
-  ResponseEntity<Map<String, String>> errorRest(ErrorRest error) {
+  ResponseEntity<ErrorRespuesta> errorRest(ErrorRest error) {
     return respuesta(error.status(), error.getMessage());
   }
 
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  ResponseEntity<Map<String, String>> fotoMuyGrande(MaxUploadSizeExceededException error) {
+  ResponseEntity<ErrorRespuesta> fotoMuyGrande(MaxUploadSizeExceededException error) {
     return respuesta(HttpStatus.BAD_REQUEST, "La foto debe pesar 5 MB o menos.");
   }
 
   @ExceptionHandler(MultipartException.class)
-  ResponseEntity<Map<String, String>> fotoInvalida(MultipartException error) {
+  ResponseEntity<ErrorRespuesta> fotoInvalida(MultipartException error) {
     return respuesta(HttpStatus.BAD_REQUEST, "No se pudo recibir la foto.");
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
-  ResponseEntity<Map<String, String>> cuerpoInvalido(HttpMessageNotReadableException error) {
+  ResponseEntity<ErrorRespuesta> cuerpoInvalido(HttpMessageNotReadableException error) {
     return respuesta(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
   }
 
   @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class, HttpRequestMethodNotSupportedException.class})
-  ResponseEntity<Map<String, String>> rutaNoEncontrada(Exception error) {
+  ResponseEntity<ErrorRespuesta> rutaNoEncontrada(Exception error) {
     return respuesta(HttpStatus.NOT_FOUND, "Ruta no encontrada.");
   }
 
   @ExceptionHandler(Exception.class)
-  ResponseEntity<Map<String, String>> errorInesperado(Exception error) {
+  ResponseEntity<ErrorRespuesta> errorInesperado(Exception error) {
     log.error("Error no controlado", error);
     return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor.");
   }
 
-  private static ResponseEntity<Map<String, String>> respuesta(HttpStatus status, String mensaje) {
-    return ResponseEntity.status(status).body(Map.of("error", mensaje));
+  private static ResponseEntity<ErrorRespuesta> respuesta(HttpStatus status, String mensaje) {
+    return ResponseEntity.status(status).body(new ErrorRespuesta(mensaje));
   }
 }
