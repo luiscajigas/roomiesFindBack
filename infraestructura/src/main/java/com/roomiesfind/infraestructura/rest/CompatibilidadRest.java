@@ -8,11 +8,12 @@ import com.roomiesfind.contratos.compatibilidad.TraducirRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerPerfilRequest;
 import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.Explicacion;
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.Registrado;
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.Traduccion;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Historial de puntajes y explicaciones. Recibe REST del frontend y llama al microservicio por gRPC. */
 @RestController
-@RequestMapping({"/api/compatibilidad", "/api/ia"})
+@RequestMapping("/api")
 public class CompatibilidadRest {
 
   private final ClientesGrpc clientes;
@@ -33,16 +34,16 @@ public class CompatibilidadRest {
   }
 
   @RequiereAuth
-  @PostMapping("/registrar")
+  @PostMapping("/compatibilidad/registrar")
   @ResponseStatus(HttpStatus.CREATED)
-  Map<String, Boolean> registrar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  Registrado registrar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
     RegistrarRecomendacionRequest.Builder peticion = RegistrarRecomendacionRequest.newBuilder().setUsuarioId(usuarioId);
     if (Json.tieneValor(datos, "candidatoId")) peticion.setCandidatoId(Json.comoNumero(datos.get("candidatoId")));
     if (Json.tieneValor(datos, "score")) peticion.setScore(Json.comoNumero(datos.get("score")));
     clientes.compatibilidad().registrarRecomendacion(peticion.build());
-    return Map.of("registrado", true);
+    return new Registrado(true);
   }
 
   /**
@@ -50,8 +51,8 @@ public class CompatibilidadRest {
    * así la ruta solo traduce perfiles reales y no sirve de traductor gratuito.
    */
   @RequiereAuth
-  @PostMapping("/traducir-descripcion")
-  Map<String, String> traducirDescripcion(@RequestBody(required = false) JsonNode cuerpo) {
+  @PostMapping("/ia/traducir-descripcion")
+  Traduccion traducirDescripcion(@RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
     double id = Json.tieneValor(datos, "usuarioId") ? Json.comoNumero(datos.get("usuarioId")) : Double.NaN;
     if (!(id > 0 && id <= Integer.MAX_VALUE && id == Math.rint(id))) {
@@ -65,12 +66,12 @@ public class CompatibilidadRest {
         .setTexto(perfil.getDescripcion())
         .setIdioma(datos.path("idioma").asText(""))
         .build()).getTexto();
-    return Map.of("descripcion", traduccion);
+    return new Traduccion(traduccion);
   }
 
   @RequiereAuth
-  @PostMapping("/explicar")
-  Map<String, Object> explicar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  @PostMapping("/ia/explicar")
+  Explicacion explicar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
     List<String> coincidencias = Json.comoListaDeTexto(datos.get("coincidencias"));
@@ -85,14 +86,7 @@ public class CompatibilidadRest {
         .setIdioma(datos.path("idioma").asText("es"))
         .build());
 
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("id", explicacion.getId());
-    respuesta.put("estado", explicacion.getEstado());
-    respuesta.put("explicacion", explicacion.getExplicacion());
-    respuesta.put("score", explicacion.getScore());
-    respuesta.put("coincidencias", coincidencias);
-    respuesta.put("conflictos", conflictos);
-    respuesta.put("desdeCache", explicacion.getDesdeCache());
-    return respuesta;
+    return new Explicacion(explicacion.getId(), explicacion.getEstado(), explicacion.getExplicacion(),
+        explicacion.getScore(), coincidencias, conflictos, explicacion.getDesdeCache());
   }
 }
