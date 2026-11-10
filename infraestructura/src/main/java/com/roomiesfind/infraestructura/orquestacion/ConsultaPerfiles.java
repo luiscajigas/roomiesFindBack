@@ -12,6 +12,12 @@ import com.roomiesfind.contratos.perfiles.Perfil;
 import com.roomiesfind.contratos.usuarios.ObtenerUsuariosRequest;
 import com.roomiesfind.contratos.usuarios.Usuario;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.AdminRespuestas.Ficha;
+import com.roomiesfind.infraestructura.contrato.PaginaCandidatosRespuesta;
+import com.roomiesfind.infraestructura.contrato.PersonaRespuesta;
+import com.roomiesfind.infraestructura.contrato.Roles;
+import com.roomiesfind.infraestructura.orquestacion.EnParalelo.Par;
+import com.roomiesfind.infraestructura.orquestacion.EnParalelo.Trio;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,58 +28,47 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * El frontend ve cada perfil junto con el nombre de la persona, pero esos datos
- * viven en dos microservicios. Aquí se unen las dos respuestas.
+ * El frontend ve cada perfil junto con el nombre de la persona y su alerta, pero esos datos
+ * viven en tres microservicios. Aquí se unen las respuestas; las llamadas que no dependen
+ * entre sí se hacen a la vez.
  */
 @Component
 public class ConsultaPerfiles {
 
   private final ClientesGrpc clientes;
+  private final EnParalelo enParalelo;
 
-  public ConsultaPerfiles(ClientesGrpc clientes) {
+  public ConsultaPerfiles(ClientesGrpc clientes, EnParalelo enParalelo) {
     this.clientes = clientes;
+    this.enParalelo = enParalelo;
   }
 
-  public Map<String, Object> miPerfil(int usuarioId) {
-    Perfil perfil = clientes.perfiles().obtenerPerfil(ObtenerPerfilRequest.newBuilder().setUsuarioId(usuarioId).build());
-    Usuario usuario = usuarios(List.of(usuarioId)).get(usuarioId);
-
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("id", usuarioId);
-    respuesta.put("nombre", usuario == null ? null : usuario.getNombre());
-    respuesta.put("email", usuario == null ? null : usuario.getEmail());
-    respuesta.putAll(aMapa(perfil));
-    respuesta.put("alerta", conAlerta(List.of(usuarioId)).contains(usuarioId));
-    return respuesta;
+  public PersonaRespuesta miPerfil(int usuarioId) {
+    Trio<Perfil, Map<Integer, Usuario>, Set<Integer>> datos = enParalelo.tres(
+        () -> clientes.perfiles().obtenerPerfil(ObtenerPerfilRequest.newBuilder().setUsuarioId(usuarioId).build()),
+        () -> usuarios(List.of(usuarioId)),
+        () -> conAlerta(List.of(usuarioId)));
+    Usuario usuario = datos.segundo().getOrDefault(usuarioId, Usuario.getDefaultInstance());
+    return PersonaRespuesta.de(datos.primero(), usuario, datos.tercero().contains(usuarioId))
+        .conEmail(usuario.getEmail());
   }
 
   /**
-   * Una página de personas. Une tres servicios: moderación dice a quién no mostrar,
-   * perfiles filtra y ordena, y usuarios pone el nombre.
+   * Una página de personas. Moderación y usuarios dicen a quién no mostrar, perfiles filtra
+   * y ordena, y luego usuarios y moderación ponen el nombre y la alerta.
    */
-  public Map<String, Object> buscar(int usuarioId, BuscarCandidatosRequest.Builder peticion) {
+  public PaginaCandidatosRespuesta buscar(int usuarioId, BuscarCandidatosRequest.Builder peticion) {
     BuscarCandidatosResponse pagina = clientes.perfiles().buscarCandidatos(peticion
         .setUsuarioId(usuarioId)
         .addAllExcluirIds(excluidos(usuarioId))
         .build());
-    List<CandidatoPuntuado> encontrados = pagina.getCandidatosList();
-    Map<Integer, Integer> puntajes = encontrados.stream()
+    Map<Integer, Integer> puntajes = pagina.getCandidatosList().stream()
         .collect(Collectors.toMap((candidato) -> candidato.getPerfil().getUsuarioId(), CandidatoPuntuado::getPuntaje));
-
-    List<Map<String, Object>> candidatos = conNombre(encontrados.stream().map(CandidatoPuntuado::getPerfil).toList());
-    candidatos.forEach((candidato) -> candidato.put("puntaje", puntajes.get((Integer) candidato.get("id"))));
-
-    Map<String, Object> resumen = new LinkedHashMap<>();
-    resumen.put("muyBien", pagina.getResumen().getMuyBien());
-    resumen.put("buena", pagina.getResumen().getBuena());
-    resumen.put("conversar", pagina.getResumen().getConversar());
-    resumen.put("distintos", pagina.getResumen().getDistintos());
-
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("candidatos", candidatos);
-    respuesta.put("total", pagina.getTotal());
-    respuesta.put("resumen", resumen);
-    return respuesta;
+    List<PersonaRespuesta> candidatos = conNombre(pagina.getCandidatosList().stream().map(CandidatoPuntuado::getPerfil).toList())
+        .stream()
+        .map((persona) -> persona.conPuntaje(puntajes.get(persona.id())))
+        .toList();
+    return new PaginaCandidatosRespuesta(candidatos, pagina.getTotal(), PaginaCandidatosRespuesta.Resumen.de(pagina.getResumen()));
   }
 
   /**
@@ -81,65 +76,52 @@ public class ConsultaPerfiles {
    * suspendidas y las de administración, que no buscan compañero.
    */
   public Set<Integer> excluidos(int usuarioId) {
-    Set<Integer> excluidos = new HashSet<>(clientes.moderacion()
-        .listarExcluidos(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build())
-        .getIdsList());
-    clientes.usuarios().listarAdministradores(Empty.getDefaultInstance()).getUsuariosList().stream()
-        .map(Usuario::getId)
-        .filter((id) -> id != usuarioId)
-        .forEach(excluidos::add);
+    Par<List<Integer>, List<Usuario>> datos = enParalelo.ambos(
+        () -> clientes.moderacion().listarExcluidos(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build()).getIdsList(),
+        () -> clientes.usuarios().listarAdministradores(Empty.getDefaultInstance()).getUsuariosList());
+    Set<Integer> excluidos = new HashSet<>(datos.primero());
+    datos.segundo().stream().map(Usuario::getId).filter((id) -> id != usuarioId).forEach(excluidos::add);
     return Set.copyOf(excluidos);
   }
 
   /** Solo las personas pedidas, para no traer a todos los usuarios cuando no hace falta. */
-  public List<Map<String, Object>> personas(List<Integer> ids) {
+  public List<PersonaRespuesta> personas(List<Integer> ids) {
     if (ids.isEmpty()) return List.of();
-    return conNombre(clientes.perfiles()
-        .obtenerPerfiles(ObtenerPerfilesRequest.newBuilder().addAllUsuarioIds(ids).build())
-        .getPerfilesList());
-  }
-
-  private List<Map<String, Object>> conNombre(List<Perfil> perfiles) {
-    List<Integer> ids = perfiles.stream().map(Perfil::getUsuarioId).toList();
-    Map<Integer, Usuario> usuarios = usuarios(ids);
-    Set<Integer> conAlerta = conAlerta(ids);
-
-    return perfiles.stream()
-        // Un perfil cuyo usuario ya no existe no se muestra.
-        .filter((perfil) -> usuarios.containsKey(perfil.getUsuarioId()))
-        .map((perfil) -> {
-          Map<String, Object> candidato = new LinkedHashMap<>();
-          candidato.put("id", perfil.getUsuarioId());
-          candidato.put("nombre", usuarios.get(perfil.getUsuarioId()).getNombre());
-          candidato.putAll(aMapa(perfil));
-          candidato.put("alerta", conAlerta.contains(perfil.getUsuarioId()));
-          return candidato;
-        })
-        .toList();
+    return conNombre(perfiles(ids));
   }
 
   /**
    * Nombre, correo, rol y foto de cada persona, para el panel de administración.
-   * Incluye a quien no tiene perfil o está suspendido; las cuentas borradas no vienen.
+   * Incluye a quien está suspendido; las cuentas borradas no vienen.
    */
-  public Map<Integer, Map<String, Object>> fichas(List<Integer> ids) {
+  public Map<Integer, Ficha> fichas(List<Integer> ids) {
     if (ids.isEmpty()) return Map.of();
-    Map<Integer, Perfil> perfiles = clientes.perfiles()
-        .obtenerPerfiles(ObtenerPerfilesRequest.newBuilder().addAllUsuarioIds(ids).build())
-        .getPerfilesList().stream()
-        .collect(Collectors.toMap(Perfil::getUsuarioId, Function.identity()));
-    Map<Integer, Map<String, Object>> fichas = new LinkedHashMap<>();
-    usuarios(ids).forEach((id, usuario) -> {
-      Map<String, Object> ficha = new LinkedHashMap<>();
-      ficha.put("id", id);
-      ficha.put("nombre", usuario.getNombre());
-      ficha.put("email", usuario.getEmail());
-      ficha.put("rol", usuario.getRol().isEmpty() ? "usuario" : usuario.getRol());
+    Par<List<Perfil>, Map<Integer, Usuario>> datos = enParalelo.ambos(() -> perfiles(ids), () -> usuarios(ids));
+    Map<Integer, Perfil> perfiles = datos.primero().stream().collect(Collectors.toMap(Perfil::getUsuarioId, Function.identity()));
+    Map<Integer, Ficha> fichas = new LinkedHashMap<>();
+    datos.segundo().forEach((id, usuario) -> {
       Perfil perfil = perfiles.get(id);
-      ficha.put("foto_url", perfil != null && perfil.hasFotoUrl() ? perfil.getFotoUrl() : null);
-      fichas.put(id, ficha);
+      fichas.put(id, new Ficha(id, usuario.getNombre(), usuario.getEmail(), Roles.normalizar(usuario.getRol()),
+          perfil != null && perfil.hasFotoUrl() ? perfil.getFotoUrl() : null));
     });
     return fichas;
+  }
+
+  private List<PersonaRespuesta> conNombre(List<Perfil> perfiles) {
+    List<Integer> ids = perfiles.stream().map(Perfil::getUsuarioId).toList();
+    Par<Map<Integer, Usuario>, Set<Integer>> datos = enParalelo.ambos(() -> usuarios(ids), () -> conAlerta(ids));
+    return perfiles.stream()
+        // Un perfil cuyo usuario ya no existe no se muestra.
+        .filter((perfil) -> datos.primero().containsKey(perfil.getUsuarioId()))
+        .map((perfil) -> PersonaRespuesta.de(perfil, datos.primero().get(perfil.getUsuarioId()),
+            datos.segundo().contains(perfil.getUsuarioId())))
+        .toList();
+  }
+
+  private List<Perfil> perfiles(List<Integer> ids) {
+    return clientes.perfiles()
+        .obtenerPerfiles(ObtenerPerfilesRequest.newBuilder().addAllUsuarioIds(ids).build())
+        .getPerfilesList();
   }
 
   private Set<Integer> conAlerta(List<Integer> ids) {
@@ -154,24 +136,5 @@ public class ConsultaPerfiles {
     return clientes.usuarios().obtenerUsuarios(ObtenerUsuariosRequest.newBuilder().addAllIds(ids).build())
         .getUsuariosList().stream()
         .collect(Collectors.toMap(Usuario::getId, Function.identity()));
-  }
-
-  /** Conserva los nombres de campo que ya usa el frontend. */
-  public static Map<String, Object> aMapa(Perfil perfil) {
-    Map<String, Object> mapa = new LinkedHashMap<>();
-    mapa.put("usuario_id", perfil.getUsuarioId());
-    mapa.put("presupuesto", perfil.getPresupuesto());
-    mapa.put("zona_id", perfil.getZonaId());
-    mapa.put("horario", perfil.getHorario());
-    mapa.put("limpieza", perfil.getLimpieza());
-    mapa.put("tolerancia_ruido", perfil.getToleranciaRuido());
-    mapa.put("frecuencia_visitas", perfil.getFrecuenciaVisitas());
-    mapa.put("tiene_mascotas", perfil.getTieneMascotas());
-    mapa.put("acepta_mascotas", perfil.getAceptaMascotas());
-    mapa.put("descripcion", perfil.hasDescripcion() ? perfil.getDescripcion() : null);
-    mapa.put("foto_url", perfil.hasFotoUrl() ? perfil.getFotoUrl() : null);
-    mapa.put("actualizado_en", perfil.getActualizadoEn());
-    mapa.put("zona", perfil.getZona());
-    return mapa;
   }
 }

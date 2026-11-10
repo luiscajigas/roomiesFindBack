@@ -8,12 +8,13 @@ import com.roomiesfind.contratos.perfiles.Foto;
 import com.roomiesfind.contratos.perfiles.GuardarFotoRequest;
 import com.roomiesfind.contratos.perfiles.ObtenerFotoRequest;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.FotoGuardada;
+import com.roomiesfind.infraestructura.contrato.PaginaCandidatosRespuesta;
+import com.roomiesfind.infraestructura.contrato.PersonaRespuesta;
 import com.roomiesfind.infraestructura.orquestacion.ConsultaPerfiles;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -44,7 +45,7 @@ public class PerfilesRest {
   @GetMapping("/{usuarioId}/foto")
   ResponseEntity<byte[]> foto(@PathVariable String usuarioId) {
     Foto foto = clientes.perfiles().obtenerFoto(
-        ObtenerFotoRequest.newBuilder().setUsuarioId(leerId(usuarioId)).build());
+        ObtenerFotoRequest.newBuilder().setUsuarioId(Parametros.idTolerante(usuarioId)).build());
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(foto.getTipoMime()))
         .header(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -54,36 +55,36 @@ public class PerfilesRest {
 
   @RequiereAuth
   @GetMapping("/me")
-  Map<String, Object> miPerfil(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
+  PersonaRespuesta miPerfil(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
     return consulta.miPerfil(usuarioId);
   }
 
   @RequiereAuth
   @PutMapping("/me/foto")
-  Map<String, String> guardarFoto(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  FotoGuardada guardarFoto(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestParam(value = "foto", required = false) MultipartFile archivo) {
     if (archivo == null || archivo.isEmpty()) {
       throw new ErrorRest(HttpStatus.BAD_REQUEST, "Selecciona una foto para continuar.");
     }
     String ruta = clientes.perfiles().guardarFoto(GuardarFotoRequest.newBuilder()
         .setUsuarioId(usuarioId).setFoto(Archivos.aFoto(archivo)).build()).getFotoUrl();
-    return Map.of("foto_url", ruta);
+    return new FotoGuardada(ruta);
   }
 
   @RequiereAuth
   @PutMapping("/me")
-  Map<String, Object> actualizar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  PersonaRespuesta actualizar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestBody(required = false) JsonNode cuerpo) {
     DatosPerfil datos = leerCambios(Json.objetoOVacio(cuerpo));
-    return ConsultaPerfiles.aMapa(clientes.perfiles().actualizarPerfil(
-        ActualizarPerfilRequest.newBuilder().setUsuarioId(usuarioId).setDatos(datos).build()));
+    clientes.perfiles().actualizarPerfil(ActualizarPerfilRequest.newBuilder().setUsuarioId(usuarioId).setDatos(datos).build());
+    return consulta.miPerfil(usuarioId);
   }
 
   @RequiereAuth
   @GetMapping("/{usuarioId}")
-  Map<String, Object> persona(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int yo,
+  PersonaRespuesta persona(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int yo,
       @PathVariable String usuarioId) {
-    int id = leerId(usuarioId);
+    int id = Parametros.idTolerante(usuarioId);
     // Para quien bloqueó o fue bloqueado, la otra persona no existe.
     if (consulta.excluidos(yo).contains(id)) throw new ErrorRest(HttpStatus.NOT_FOUND, "Perfil no encontrado.");
     return consulta.personas(List.of(id)).stream().findFirst()
@@ -93,7 +94,7 @@ public class PerfilesRest {
   /** Una página de personas con los filtros que lleguen. Lo que no llega no se filtra. */
   @RequiereAuth
   @GetMapping("/buscar")
-  Map<String, Object> buscar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  PaginaCandidatosRespuesta buscar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestParam(required = false) String pagina,
       @RequestParam(required = false) String tamano,
       @RequestParam(required = false) String orden,
@@ -103,40 +104,15 @@ public class PerfilesRest {
       @RequestParam(required = false) String mascotas,
       @RequestParam(required = false) String puntajeMinimo) {
     BuscarCandidatosRequest.Builder peticion = BuscarCandidatosRequest.newBuilder();
-    if (tieneTexto(pagina)) peticion.setPagina(leerEntero(pagina));
-    if (tieneTexto(tamano)) peticion.setTamano(leerEntero(tamano));
-    if (tieneTexto(orden)) peticion.setOrden(orden);
-    if (zonas != null) peticion.addAllZonas(zonas.stream().filter(PerfilesRest::tieneTexto).toList());
-    if (tieneTexto(horario)) peticion.setHorario(horario);
-    if (tieneTexto(presupuestoMaximo)) peticion.setPresupuestoMaximo(leerEntero(presupuestoMaximo));
-    if (tieneTexto(mascotas)) peticion.setMascotas(mascotas);
-    if (tieneTexto(puntajeMinimo)) peticion.setPuntajeMinimo(leerEntero(puntajeMinimo));
+    if (Parametros.tieneTexto(pagina)) peticion.setPagina(Parametros.entero(pagina));
+    if (Parametros.tieneTexto(tamano)) peticion.setTamano(Parametros.entero(tamano));
+    if (Parametros.tieneTexto(orden)) peticion.setOrden(orden);
+    if (zonas != null) peticion.addAllZonas(zonas.stream().filter(Parametros::tieneTexto).toList());
+    if (Parametros.tieneTexto(horario)) peticion.setHorario(horario);
+    if (Parametros.tieneTexto(presupuestoMaximo)) peticion.setPresupuestoMaximo(Parametros.entero(presupuestoMaximo));
+    if (Parametros.tieneTexto(mascotas)) peticion.setMascotas(mascotas);
+    if (Parametros.tieneTexto(puntajeMinimo)) peticion.setPuntajeMinimo(Parametros.entero(puntajeMinimo));
     return consulta.buscar(usuarioId, peticion);
-  }
-
-  private static boolean tieneTexto(String valor) {
-    return valor != null && !valor.isBlank();
-  }
-
-  private static int leerEntero(String texto) {
-    try {
-      return Integer.parseInt(texto.trim());
-    } catch (NumberFormatException error) {
-      throw new ErrorRest(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
-    }
-  }
-
-  private static int leerId(String texto) {
-    try {
-      BigDecimal id = new BigDecimal(texto);
-      if (id.signum() > 0 && id.stripTrailingZeros().scale() <= 0) {
-        // Un número válido pero enorme simplemente no existe.
-        return id.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0 ? Integer.MAX_VALUE : id.intValueExact();
-      }
-    } catch (NumberFormatException error) {
-      // Se responde abajo como identificador inválido.
-    }
-    throw new ErrorRest(HttpStatus.BAD_REQUEST, "Identificador de perfil inválido.");
   }
 
   private static DatosPerfil leerCambios(JsonNode cuerpo) {

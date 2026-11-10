@@ -10,13 +10,14 @@ import com.roomiesfind.contratos.chat.Mensaje;
 import com.roomiesfind.contratos.chat.NotificarEscribiendoRequest;
 import com.roomiesfind.contratos.usuarios.ValidarTokenRequest;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.ChatRespuestas.MensajeRespuesta;
+import com.roomiesfind.infraestructura.contrato.EventoNavegador;
 import com.roomiesfind.infraestructura.seguridad.Suspensiones;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -105,7 +106,7 @@ public class ChatWebSocket extends TextWebSocketHandler {
             .setUsuarioId(conexion.usuarioId).setOtroId(datos.path("otroId").asInt()).build());
         case "escribiendo" -> clientes.chat().notificarEscribiendo(NotificarEscribiendoRequest.newBuilder()
             .setUsuarioId(conexion.usuarioId).setDestinatarioId(datos.path("destinatarioId").asInt()).build());
-        case "ping" -> responder(conexion, Map.of("tipo", "pong"));
+        case "ping" -> responder(conexion, new EventoNavegador.Pong());
         default -> cerrar(conexion, CloseStatus.BAD_DATA);
       }
     } catch (StatusRuntimeException error) {
@@ -133,7 +134,7 @@ public class ChatWebSocket extends TextWebSocketHandler {
       return;
     }
     escucharEventos(conexion);
-    responder(conexion, Map.of("tipo", "listo", "usuarioId", conexion.usuarioId));
+    responder(conexion, new EventoNavegador.Listo(conexion.usuarioId));
   }
 
   /** Abre el stream gRPC. Si se corta, cierra el WebSocket: el navegador reconecta y se pone al día. */
@@ -148,7 +149,8 @@ public class ChatWebSocket extends TextWebSocketHandler {
 
           @Override
           public void onNext(EventoChat evento) {
-            responder(conexion, aMapa(evento));
+            EventoNavegador traducido = EventoNavegador.de(evento);
+            if (traducido != null) responder(conexion, traducido);
           }
 
           @Override
@@ -179,19 +181,11 @@ public class ChatWebSocket extends TextWebSocketHandler {
         .setDestinatarioId(datos.path("destinatarioId").asInt())
         .setContenido(datos.path("contenido").asText(""))
         .build());
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("tipo", "enviado");
-    respuesta.put("idCliente", idCliente);
-    respuesta.put("mensaje", ChatRest.aMapa(guardado));
-    responder(conexion, respuesta);
+    responder(conexion, new EventoNavegador.Enviado(idCliente, MensajeRespuesta.de(guardado)));
   }
 
   private void enviarError(ConexionChat conexion, String idCliente, Status status) {
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("tipo", "error");
-    respuesta.put("idCliente", idCliente);
-    respuesta.put("mensaje", mensajeDeError(status));
-    responder(conexion, respuesta);
+    responder(conexion, new EventoNavegador.ErrorEnvio(idCliente, mensajeDeError(status)));
   }
 
   static String mensajeDeError(Status status) {
@@ -202,37 +196,7 @@ public class ChatWebSocket extends TextWebSocketHandler {
     };
   }
 
-  private static Map<String, Object> aMapa(EventoChat evento) {
-    Map<String, Object> mapa = new LinkedHashMap<>();
-    switch (evento.getEventoCase()) {
-      case MENSAJE -> {
-        mapa.put("tipo", "mensaje");
-        mapa.put("mensaje", ChatRest.aMapa(evento.getMensaje()));
-      }
-      case LEIDOS -> {
-        mapa.put("tipo", "leidos");
-        mapa.put("lectorId", evento.getLeidos().getLectorId());
-        mapa.put("remitenteId", evento.getLeidos().getRemitenteId());
-        mapa.put("leidoEn", evento.getLeidos().getLeidoEn());
-      }
-      case ESCRIBIENDO -> {
-        mapa.put("tipo", "escribiendo");
-        mapa.put("usuarioId", evento.getEscribiendo().getUsuarioId());
-      }
-      case ALERTA -> {
-        mapa.put("tipo", "alerta");
-        mapa.put("usuarioId", evento.getAlerta().getUsuarioId());
-      }
-      case BLOQUEO -> {
-        mapa.put("tipo", "bloqueo");
-        mapa.put("usuarioId", evento.getBloqueo().getUsuarioId());
-      }
-      default -> mapa.put("tipo", "desconocido");
-    }
-    return mapa;
-  }
-
-  private void responder(ConexionChat conexion, Map<String, ?> datos) {
+  private void responder(ConexionChat conexion, EventoNavegador datos) {
     try {
       if (conexion.sesion.isOpen()) conexion.sesion.sendMessage(new TextMessage(json.writeValueAsString(datos)));
     } catch (IOException | IllegalStateException error) {

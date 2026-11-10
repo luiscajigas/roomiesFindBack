@@ -7,12 +7,13 @@ import com.roomiesfind.contratos.moderacion.ParejaRequest;
 import com.roomiesfind.contratos.moderacion.ReportarRequest;
 import com.roomiesfind.contratos.moderacion.UsuarioRequest;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.OtrasRespuestas.ReporteCreado;
+import com.roomiesfind.infraestructura.contrato.PersonaRespuesta;
 import com.roomiesfind.infraestructura.orquestacion.ConsultaPerfiles;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAuth;
 import io.grpc.StatusRuntimeException;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -47,7 +48,7 @@ public class ModeracionRest {
 
   @RequiereAuth
   @GetMapping("/bloqueos")
-  List<Map<String, Object>> bloqueados(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
+  List<PersonaRespuesta> bloqueados(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId) {
     return consulta.personas(clientes.moderacion()
         .listarBloqueados(UsuarioRequest.newBuilder().setUsuarioId(usuarioId).build())
         .getIdsList());
@@ -57,14 +58,14 @@ public class ModeracionRest {
   @PostMapping("/bloqueos/{otroId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void bloquear(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId, @PathVariable String otroId) {
-    bloquear(usuarioId, leerId(otroId));
+    bloquear(usuarioId, Parametros.id(otroId));
   }
 
   @RequiereAuth
   @DeleteMapping("/bloqueos/{otroId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void desbloquear(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId, @PathVariable String otroId) {
-    int id = leerId(otroId);
+    int id = Parametros.id(otroId);
     clientes.moderacion().desbloquear(ParejaRequest.newBuilder().setUsuarioId(usuarioId).setOtroId(id).build());
     avisarBloqueo(usuarioId, id);
   }
@@ -72,7 +73,7 @@ public class ModeracionRest {
   @RequiereAuth
   @PostMapping("/reportes")
   @ResponseStatus(HttpStatus.CREATED)
-  Map<String, Boolean> reportar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
+  ReporteCreado reportar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int usuarioId,
       @RequestBody(required = false) JsonNode cuerpo) {
     JsonNode datos = Json.objetoOVacio(cuerpo);
     double reportado = Json.tieneValor(datos, "reportadoId") ? Json.comoNumero(datos.get("reportadoId")) : Double.NaN;
@@ -90,7 +91,7 @@ public class ModeracionRest {
 
     if (alertaActivada) avisarAlerta(reportadoId);
     if (datos.path("bloquear").asBoolean(false)) bloquear(usuarioId, reportadoId);
-    return Map.of("alertaActivada", alertaActivada);
+    return new ReporteCreado(alertaActivada);
   }
 
   private void bloquear(int usuarioId, int otroId) {
@@ -114,13 +115,4 @@ public class ModeracionRest {
     }
   }
 
-  private static int leerId(String texto) {
-    try {
-      int id = Integer.parseInt(texto);
-      if (id > 0) return id;
-    } catch (NumberFormatException error) {
-      // Se responde abajo como solicitud inválida.
-    }
-    throw new ErrorRest(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
-  }
 }

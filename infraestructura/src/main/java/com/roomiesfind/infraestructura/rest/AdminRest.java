@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.protobuf.Empty;
 import com.roomiesfind.contratos.moderacion.CuentaReportada;
 import com.roomiesfind.contratos.moderacion.ListarReportesRequest;
-import com.roomiesfind.contratos.moderacion.Reporte;
 import com.roomiesfind.contratos.moderacion.ResolverReportesRequest;
 import com.roomiesfind.contratos.moderacion.ResumenModeracion;
 import com.roomiesfind.contratos.moderacion.SuspenderRequest;
@@ -12,12 +11,15 @@ import com.roomiesfind.contratos.moderacion.Suspension;
 import com.roomiesfind.contratos.moderacion.UsuarioRequest;
 import com.roomiesfind.infraestructura.chat.ChatWebSocket;
 import com.roomiesfind.infraestructura.config.ClientesGrpc;
+import com.roomiesfind.infraestructura.contrato.AdminRespuestas;
+import com.roomiesfind.infraestructura.contrato.AdminRespuestas.Ficha;
+import com.roomiesfind.infraestructura.contrato.AdminRespuestas.PersonaCorta;
+import com.roomiesfind.infraestructura.contrato.AdminRespuestas.Resumen;
+import com.roomiesfind.infraestructura.contrato.Roles;
 import com.roomiesfind.infraestructura.orquestacion.ConsultaPerfiles;
 import com.roomiesfind.infraestructura.seguridad.AutenticacionInterceptor;
 import com.roomiesfind.infraestructura.seguridad.RequiereAdmin;
 import com.roomiesfind.infraestructura.seguridad.Suspensiones;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,20 +58,16 @@ public class AdminRest {
 
   @RequiereAdmin
   @GetMapping("/resumen")
-  Map<String, Object> resumen() {
+  Resumen resumen() {
     ResumenModeracion resumen = clientes.moderacion().obtenerResumen(Empty.getDefaultInstance());
-    Map<String, Object> respuesta = new LinkedHashMap<>();
-    respuesta.put("cuentasPorRevisar", resumen.getCuentasPorRevisar());
-    respuesta.put("reportesPendientes", resumen.getReportesPendientes());
-    respuesta.put("alertasActivas", resumen.getAlertasActivas());
-    respuesta.put("cuentasSuspendidas", resumen.getCuentasSuspendidas());
-    return respuesta;
+    return new Resumen(resumen.getCuentasPorRevisar(), resumen.getReportesPendientes(), resumen.getAlertasActivas(),
+        resumen.getCuentasSuspendidas());
   }
 
   /** @param estado "pendientes" (por defecto) o "todos" */
   @RequiereAdmin
   @GetMapping("/reportes")
-  List<Map<String, Object>> reportes(@RequestParam(required = false) String estado) {
+  List<AdminRespuestas.CuentaReportada> reportes(@RequestParam(required = false) String estado) {
     List<CuentaReportada> cuentas = clientes.moderacion()
         .listarReportes(ListarReportesRequest.newBuilder().setSoloPendientes(!"todos".equals(estado)).build())
         .getCuentasList();
@@ -78,45 +76,35 @@ public class AdminRest {
       ids.add(cuenta.getUsuarioId());
       cuenta.getReportesList().forEach((reporte) -> ids.add(reporte.getReportanteId()));
     }
-    Map<Integer, Map<String, Object>> fichas = consulta.fichas(List.copyOf(ids));
+    Map<Integer, Ficha> fichas = consulta.fichas(List.copyOf(ids));
 
-    List<Map<String, Object>> respuesta = new ArrayList<>();
-    for (CuentaReportada cuenta : cuentas) {
-      Map<String, Object> persona = fichas.get(cuenta.getUsuarioId());
-      if (persona == null) continue;
-      List<Map<String, Object>> reportes = new ArrayList<>();
-      for (Reporte reporte : cuenta.getReportesList()) {
-        Map<String, Object> fila = new LinkedHashMap<>();
-        fila.put("id", reporte.getId());
-        fila.put("motivo", reporte.getMotivo());
-        fila.put("detalle", reporte.hasDetalle() ? reporte.getDetalle() : null);
-        fila.put("estado", reporte.getEstado());
-        fila.put("creadoEn", reporte.getCreadoEn());
-        fila.put("reportante", resumenDe(fichas.get(reporte.getReportanteId())));
-        reportes.add(fila);
-      }
-      Map<String, Object> fila = new LinkedHashMap<>();
-      fila.put("persona", persona);
-      fila.put("alerta", cuenta.getAlerta());
-      fila.put("suspendida", cuenta.getSuspendida());
-      fila.put("reportes", reportes);
-      respuesta.add(fila);
-    }
-    return respuesta;
+    return cuentas.stream()
+        // Una cuenta borrada ya no tiene nada que revisar.
+        .filter((cuenta) -> fichas.containsKey(cuenta.getUsuarioId()))
+        .map((cuenta) -> new AdminRespuestas.CuentaReportada(
+            fichas.get(cuenta.getUsuarioId()),
+            cuenta.getAlerta(),
+            cuenta.getSuspendida(),
+            cuenta.getReportesList().stream()
+                .map((reporte) -> new AdminRespuestas.Reporte(reporte.getId(), reporte.getMotivo(),
+                    reporte.hasDetalle() ? reporte.getDetalle() : null, reporte.getEstado(), reporte.getCreadoEn(),
+                    corta(fichas.get(reporte.getReportanteId()))))
+                .toList()))
+        .toList();
   }
 
   @RequiereAdmin
   @PostMapping("/cuentas/{usuarioId}/descartar")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void descartar(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int adminId, @PathVariable String usuarioId) {
-    resolver(adminId, leerId(usuarioId), "descartar");
+    resolver(adminId, Parametros.id(usuarioId), "descartar");
   }
 
   @RequiereAdmin
   @PostMapping("/cuentas/{usuarioId}/mantener")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void mantener(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int adminId, @PathVariable String usuarioId) {
-    resolver(adminId, leerId(usuarioId), "mantener");
+    resolver(adminId, Parametros.id(usuarioId), "mantener");
   }
 
   @RequiereAdmin
@@ -124,10 +112,10 @@ public class AdminRest {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void suspender(@RequestAttribute(AutenticacionInterceptor.ATRIBUTO_USUARIO) int adminId, @PathVariable String usuarioId,
       @RequestBody(required = false) JsonNode cuerpo) {
-    int id = leerId(usuarioId);
-    Map<String, Object> persona = consulta.fichas(List.of(id)).get(id);
+    int id = Parametros.id(usuarioId);
+    Ficha persona = consulta.fichas(List.of(id)).get(id);
     if (persona == null) throw new ErrorRest(HttpStatus.NOT_FOUND, "La persona no existe.");
-    if ("admin".equals(persona.get("rol")) && id != adminId) {
+    if (Roles.ADMIN.equals(persona.rol()) && id != adminId) {
       throw new ErrorRest(HttpStatus.BAD_REQUEST, "No puedes suspender a un administrador.");
     }
     clientes.moderacion().suspender(SuspenderRequest.newBuilder()
@@ -143,33 +131,30 @@ public class AdminRest {
   @DeleteMapping("/cuentas/{usuarioId}/suspension")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void reactivar(@PathVariable String usuarioId) {
-    int id = leerId(usuarioId);
+    int id = Parametros.id(usuarioId);
     clientes.moderacion().reactivar(UsuarioRequest.newBuilder().setUsuarioId(id).build());
     suspensiones.olvidar(id);
   }
 
   @RequiereAdmin
   @GetMapping("/suspendidas")
-  List<Map<String, Object>> suspendidas() {
+  List<AdminRespuestas.Suspension> suspendidas() {
     List<Suspension> lista = clientes.moderacion().listarSuspendidas(Empty.getDefaultInstance()).getSuspensionesList();
     Set<Integer> ids = new LinkedHashSet<>();
     for (Suspension suspension : lista) {
       ids.add(suspension.getUsuarioId());
       if (suspension.hasSuspendidaPor()) ids.add(suspension.getSuspendidaPor());
     }
-    Map<Integer, Map<String, Object>> fichas = consulta.fichas(List.copyOf(ids));
-    List<Map<String, Object>> respuesta = new ArrayList<>();
-    for (Suspension suspension : lista) {
-      Map<String, Object> persona = fichas.get(suspension.getUsuarioId());
-      if (persona == null) continue;
-      Map<String, Object> fila = new LinkedHashMap<>();
-      fila.put("persona", persona);
-      fila.put("motivo", suspension.getMotivo());
-      fila.put("creadaEn", suspension.getCreadaEn());
-      fila.put("suspendidaPor", suspension.hasSuspendidaPor() ? resumenDe(fichas.get(suspension.getSuspendidaPor())) : null);
-      respuesta.add(fila);
-    }
-    return respuesta;
+    Map<Integer, Ficha> fichas = consulta.fichas(List.copyOf(ids));
+
+    return lista.stream()
+        .filter((suspension) -> fichas.containsKey(suspension.getUsuarioId()))
+        .map((suspension) -> new AdminRespuestas.Suspension(
+            fichas.get(suspension.getUsuarioId()),
+            suspension.getMotivo(),
+            suspension.getCreadaEn(),
+            suspension.hasSuspendidaPor() ? corta(fichas.get(suspension.getSuspendidaPor())) : null))
+        .toList();
   }
 
   private void resolver(int adminId, int usuarioId, String decision) {
@@ -177,21 +162,8 @@ public class AdminRest {
         .setAdminId(adminId).setUsuarioId(usuarioId).setDecision(decision).build());
   }
 
-  private static Map<String, Object> resumenDe(Map<String, Object> ficha) {
-    if (ficha == null) return null;
-    Map<String, Object> resumen = new LinkedHashMap<>();
-    resumen.put("id", ficha.get("id"));
-    resumen.put("nombre", ficha.get("nombre"));
-    return resumen;
-  }
-
-  private static int leerId(String texto) {
-    try {
-      int id = Integer.parseInt(texto);
-      if (id > 0) return id;
-    } catch (NumberFormatException error) {
-      // Se responde abajo como solicitud inválida.
-    }
-    throw new ErrorRest(HttpStatus.BAD_REQUEST, "La solicitud no es válida.");
+  /** @return null si esa cuenta ya fue borrada */
+  private static PersonaCorta corta(Ficha ficha) {
+    return ficha == null ? null : ficha.corta();
   }
 }
