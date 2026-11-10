@@ -1,0 +1,842 @@
+openapi: 3.1.0
+info:
+  title: RoomiesFind API
+  version: 1.0.0
+  description: |
+    Contrato REST entre el navegador y el orquestador (módulo infraestructura).
+    Es el equivalente de los archivos .proto, que son el contrato gRPC entre microservicios.
+
+    Se escribe primero (contract-first) y de aquí sale todo lo demás:
+    - El backend responde con records de Java (paquete infraestructura.contrato) y la prueba
+      ContratoRestTest falla si una ruta o un campo no coincide con este archivo.
+    - El frontend genera sus tipos de TypeScript con `npm run contrato` (openapi-typescript).
+
+    Todos los errores responden { "error": "mensaje en español" }.
+    Las rutas protegidas necesitan el encabezado Authorization: Bearer <token>.
+
+    El chat en vivo va por WebSocket en /ws/chat. Sus mensajes están descritos en los
+    schemas MensajeAlServidor y EventoNavegador.
+
+servers:
+  - url: https://roomiesfind.eastus.cloudapp.azure.com
+  - url: http://localhost:3001
+
+security:
+  - token: []
+
+tags:
+  - name: Sesión
+  - name: Perfiles
+  - name: Compatibilidad
+  - name: Chat
+  - name: Moderación
+  - name: Administración
+
+paths:
+  /api/salud:
+    get:
+      tags: [Sesión]
+      summary: Indica si el orquestador está arriba
+      security: []
+      responses:
+        '200':
+          description: Arriba
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Salud' }
+
+  /api/auth/registro:
+    post:
+      tags: [Sesión]
+      summary: Crea la cuenta y el perfil a la vez
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/Registro' }
+      responses:
+        '201':
+          description: Cuenta creada y sesión iniciada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /api/auth/login:
+    post:
+      tags: [Sesión]
+      summary: Inicia sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credenciales' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /api/auth/sesion:
+    get:
+      tags: [Sesión]
+      summary: Datos actuales de la sesión, incluido el rol
+      responses:
+        '200':
+          description: La sesión es válida
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioSesion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /api/perfiles/me:
+    get:
+      tags: [Perfiles]
+      summary: Mi perfil, con mi correo
+      responses:
+        '200':
+          description: Mi perfil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Persona' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    put:
+      tags: [Perfiles]
+      summary: Cambia mis preferencias. Lo que no se envía no cambia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CambiosPerfil' }
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Persona' }
+        '400': { $ref: '#/components/responses/Invalida' }
+
+  /api/perfiles/me/foto:
+    put:
+      tags: [Perfiles]
+      summary: Cambia mi foto (JPG, PNG, WEBP o GIF, hasta 5 MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto]
+              properties:
+                foto: { type: string, format: binary }
+      responses:
+        '200':
+          description: Foto guardada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FotoGuardada' }
+        '400': { $ref: '#/components/responses/Invalida' }
+
+  /api/perfiles/buscar:
+    get:
+      tags: [Perfiles]
+      summary: Una página de posibles compañeros, filtrada y ordenada por el servidor
+      parameters:
+        - { name: pagina, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: tamano, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 12 } }
+        - { name: orden, in: query, schema: { $ref: '#/components/schemas/OrdenBusqueda' } }
+        - name: zona
+          in: query
+          description: Barrios aceptados. Se repite una vez por barrio
+          style: form
+          explode: true
+          schema: { type: array, maxItems: 100, items: { type: string } }
+        - { name: horario, in: query, schema: { $ref: '#/components/schemas/Horario' } }
+        - { name: presupuestoMaximo, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: mascotas, in: query, schema: { $ref: '#/components/schemas/FiltroMascotas' } }
+        - { name: puntajeMinimo, in: query, schema: { type: integer, minimum: 0, maximum: 100 } }
+      responses:
+        '200':
+          description: Una página
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaCandidatos' }
+        '400': { $ref: '#/components/responses/Invalida' }
+
+  /api/perfiles/{usuarioId}:
+    get:
+      tags: [Perfiles]
+      summary: El perfil público de una persona. Para quien bloqueó o fue bloqueado no existe
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Persona' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/perfiles/{usuarioId}/foto:
+    get:
+      tags: [Perfiles]
+      summary: La foto de perfil guardada en la base
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '200':
+          description: La imagen
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/compatibilidad/registrar:
+    post:
+      tags: [Compatibilidad]
+      summary: Guarda el puntaje que calculó el navegador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidatoId, score]
+              properties:
+                candidatoId: { type: integer }
+                score: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        '201':
+          description: Guardado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Registrado' }
+        '400': { $ref: '#/components/responses/Invalida' }
+
+  /api/ia/traducir-descripcion:
+    post:
+      tags: [Compatibilidad]
+      summary: Traduce la descripción de una persona. Recibe a quién, no el texto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuarioId, idioma]
+              properties:
+                usuarioId: { type: integer }
+                idioma: { $ref: '#/components/schemas/Idioma' }
+      responses:
+        '200':
+          description: Traducción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Traduccion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
+  /api/ia/explicar:
+    post:
+      tags: [Compatibilidad]
+      summary: Explica en lenguaje natural un puntaje ya calculado (Claude, con Gemini de respaldo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PeticionExplicacion' }
+      responses:
+        '200':
+          description: Explicación
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Explicacion' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
+  /api/chat/conversaciones:
+    get:
+      tags: [Chat]
+      summary: Mis conversaciones, la más reciente primero
+      responses:
+        '200':
+          description: Conversaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Conversacion' }
+
+  /api/chat/conversaciones/{otroId}/mensajes:
+    get:
+      tags: [Chat]
+      summary: Mensajes con una persona, de a 30, del más antiguo al más reciente
+      parameters:
+        - { name: otroId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: antesDe, in: query, description: Para traer los anteriores a este mensaje, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Una página de mensajes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaMensajes' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/moderacion/bloqueos:
+    get:
+      tags: [Moderación]
+      summary: Las personas que bloqueé
+      responses:
+        '200':
+          description: Personas bloqueadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Persona' }
+
+  /api/moderacion/bloqueos/{otroId}:
+    parameters:
+      - { name: otroId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      tags: [Moderación]
+      summary: Bloquea a una persona. Ninguna de las dos verá a la otra
+      responses:
+        '204': { description: Bloqueada }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    delete:
+      tags: [Moderación]
+      summary: Quita un bloqueo propio
+      responses:
+        '204': { description: Desbloqueada }
+
+  /api/moderacion/reportes:
+    post:
+      tags: [Moderación]
+      summary: Reporta una cuenta. Con 3 personas distintas la cuenta recibe una alerta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PeticionReporte' }
+      responses:
+        '201':
+          description: Reporte guardado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReporteCreado' }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /api/admin/resumen:
+    get:
+      tags: [Administración]
+      summary: Cifras del panel. Solo administradores
+      responses:
+        '200':
+          description: Cifras
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumenAdmin' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /api/admin/reportes:
+    get:
+      tags: [Administración]
+      summary: Cuentas reportadas con sus reportes. Solo administradores
+      parameters:
+        - name: estado
+          in: query
+          schema: { type: string, enum: [pendientes, todos], default: pendientes }
+      responses:
+        '200':
+          description: Cuentas reportadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CuentaReportada' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /api/admin/cuentas/{usuarioId}/descartar:
+    post:
+      tags: [Administración]
+      summary: Descarta los reportes de una cuenta y quita su alerta
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '204': { description: Descartados }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/admin/cuentas/{usuarioId}/mantener:
+    post:
+      tags: [Administración]
+      summary: Marca los reportes pendientes como revisados y deja la alerta
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '204': { description: Revisados }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/admin/cuentas/{usuarioId}/suspension:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    post:
+      tags: [Administración]
+      summary: Suspende una cuenta. No puede entrar ni aparece para nadie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '204': { description: Suspendida }
+        '400': { $ref: '#/components/responses/Invalida' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    delete:
+      tags: [Administración]
+      summary: Reactiva una cuenta suspendida
+      responses:
+        '204': { description: Reactivada }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/admin/suspendidas:
+    get:
+      tags: [Administración]
+      summary: Cuentas suspendidas. Solo administradores
+      responses:
+        '200':
+          description: Cuentas suspendidas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Suspension' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UsuarioId:
+      name: usuarioId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    Invalida:
+      description: La solicitud no es válida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoAutenticado:
+      description: Falta la sesión o no es válida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Prohibido:
+      description: Cuenta suspendida o sin permiso
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: No existe, o para esta persona no existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflicto:
+      description: Ya existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoDisponible:
+      description: Un servicio externo no respondió
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    # ---------- Valores ----------
+    Horario: { type: string, enum: [madrugador, nocturno, mixto] }
+    FrecuenciaVisitas: { type: string, enum: [nunca, ocasional, frecuente] }
+    OrdenBusqueda: { type: string, enum: [compatibilidad, presupuesto, recientes] }
+    FiltroMascotas: { type: string, enum: [sin_mascotas, con_mascotas, aceptan] }
+    Idioma: { type: string, enum: [es, en] }
+    Rol: { type: string, enum: [usuario, admin] }
+    MotivoReporte: { type: string, enum: [acoso, perfil_falso, estafa, contenido_inapropiado, otro] }
+    EstadoReporte: { type: string, enum: [pendiente, revisado, descartado] }
+
+    # ---------- Generales ----------
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: Mensaje en español que se puede mostrar }
+    Salud:
+      type: object
+      required: [estado, servicio]
+      properties:
+        estado: { type: string }
+        servicio: { type: string }
+
+    # ---------- Sesión ----------
+    Credenciales:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    Registro:
+      type: object
+      required: [nombre, email, password, presupuesto, zona, horario]
+      properties:
+        nombre: { type: string }
+        email: { type: string }
+        password: { type: string }
+        presupuesto: { type: integer, minimum: 0 }
+        zona: { type: string }
+        horario: { $ref: '#/components/schemas/Horario' }
+        limpieza: { type: integer, minimum: 1, maximum: 5 }
+        tolerancia_ruido: { type: integer, minimum: 1, maximum: 5 }
+        frecuencia_visitas: { $ref: '#/components/schemas/FrecuenciaVisitas' }
+        tiene_mascotas: { type: boolean }
+        acepta_mascotas: { type: boolean }
+        descripcion: { type: string, maxLength: 1000 }
+        foto: { type: string, format: binary }
+    UsuarioSesion:
+      type: object
+      required: [id, nombre, email, rol]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        email: { type: string }
+        rol: { $ref: '#/components/schemas/Rol' }
+    Sesion:
+      type: object
+      required: [token, usuario]
+      properties:
+        token: { type: string }
+        usuario: { $ref: '#/components/schemas/UsuarioSesion' }
+
+    # ---------- Perfiles ----------
+    Persona:
+      type: object
+      description: Una persona con su perfil. Los nombres en snake_case vienen del backend original
+      required: [id, nombre, usuario_id, presupuesto, zona_id, zona, horario, limpieza, tolerancia_ruido,
+        frecuencia_visitas, tiene_mascotas, acepta_mascotas, descripcion, foto_url, actualizado_en, alerta]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        email: { type: string, description: Solo en el perfil propio }
+        usuario_id: { type: integer }
+        presupuesto: { type: integer }
+        zona_id: { type: integer }
+        zona: { type: string }
+        horario: { $ref: '#/components/schemas/Horario' }
+        limpieza: { type: integer, minimum: 1, maximum: 5 }
+        tolerancia_ruido: { type: integer, minimum: 1, maximum: 5 }
+        frecuencia_visitas: { $ref: '#/components/schemas/FrecuenciaVisitas' }
+        tiene_mascotas: { type: boolean }
+        acepta_mascotas: { type: boolean }
+        descripcion: { type: [string, 'null'] }
+        foto_url: { type: [string, 'null'] }
+        actualizado_en: { type: string }
+        alerta: { type: boolean, description: Varias personas distintas reportaron esta cuenta }
+        puntaje: { type: integer, minimum: 0, maximum: 100, description: Solo en la búsqueda }
+    CambiosPerfil:
+      type: object
+      properties:
+        presupuesto: { type: integer, minimum: 0 }
+        zona: { type: string }
+        horario: { $ref: '#/components/schemas/Horario' }
+        limpieza: { type: integer, minimum: 1, maximum: 5 }
+        tolerancia_ruido: { type: integer, minimum: 1, maximum: 5 }
+        frecuencia_visitas: { $ref: '#/components/schemas/FrecuenciaVisitas' }
+        tiene_mascotas: { type: boolean }
+        acepta_mascotas: { type: boolean }
+        descripcion: { type: string, maxLength: 1000 }
+        foto_url: { type: string }
+    ResumenNiveles:
+      type: object
+      required: [muyBien, buena, conversar, distintos]
+      properties:
+        muyBien: { type: integer, description: 85 o más }
+        buena: { type: integer, description: De 65 a 84 }
+        conversar: { type: integer, description: De 40 a 64 }
+        distintos: { type: integer, description: Menos de 40 }
+    PaginaCandidatos:
+      type: object
+      required: [candidatos, total, resumen]
+      properties:
+        candidatos:
+          type: array
+          items: { $ref: '#/components/schemas/Persona' }
+        total: { type: integer, description: De todas las páginas }
+        resumen: { $ref: '#/components/schemas/ResumenNiveles' }
+    FotoGuardada:
+      type: object
+      required: [foto_url]
+      properties:
+        foto_url: { type: string }
+
+    # ---------- Compatibilidad ----------
+    Registrado:
+      type: object
+      required: [registrado]
+      properties:
+        registrado: { type: boolean }
+    Traduccion:
+      type: object
+      required: [descripcion]
+      properties:
+        descripcion: { type: string }
+    PeticionExplicacion:
+      type: object
+      required: [candidatoId, score, coincidencias, conflictos, idioma]
+      properties:
+        candidatoId: { type: integer }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        coincidencias: { type: array, items: { type: string } }
+        conflictos: { type: array, items: { type: string } }
+        idioma: { $ref: '#/components/schemas/Idioma' }
+    Explicacion:
+      type: object
+      required: [id, estado, explicacion, score, coincidencias, conflictos, desdeCache]
+      properties:
+        id: { type: integer }
+        estado: { type: string, enum: [pendiente, generado] }
+        explicacion: { type: string }
+        score: { type: integer }
+        coincidencias: { type: array, items: { type: string } }
+        conflictos: { type: array, items: { type: string } }
+        desdeCache: { type: boolean, description: Se devolvió una explicación ya guardada sin llamar a la IA }
+
+    # ---------- Chat ----------
+    Mensaje:
+      type: object
+      required: [id, remitenteId, destinatarioId, contenido, creadoEn, leidoEn]
+      properties:
+        id: { type: integer, format: int64 }
+        remitenteId: { type: integer }
+        destinatarioId: { type: integer }
+        contenido: { type: string, minLength: 1, maxLength: 2000 }
+        creadoEn: { type: string, format: date-time }
+        leidoEn: { type: [string, 'null'], format: date-time }
+    Conversacion:
+      type: object
+      required: [otroId, persona, ultimoMensaje, noLeidos]
+      properties:
+        otroId: { type: integer }
+        persona: { $ref: '#/components/schemas/Persona' }
+        ultimoMensaje: { $ref: '#/components/schemas/Mensaje' }
+        noLeidos: { type: integer }
+    PaginaMensajes:
+      type: object
+      required: [mensajes, hayMas]
+      properties:
+        mensajes:
+          type: array
+          items: { $ref: '#/components/schemas/Mensaje' }
+        hayMas: { type: boolean }
+
+    # ---------- WebSocket /ws/chat ----------
+    MensajeAlServidor:
+      description: Lo que el navegador envía por el WebSocket. El primero debe ser «autenticar».
+      oneOf:
+        - type: object
+          required: [tipo, token]
+          properties:
+            tipo: { const: autenticar }
+            token: { type: string }
+        - type: object
+          required: [tipo, destinatarioId, contenido, idCliente]
+          properties:
+            tipo: { const: enviar }
+            destinatarioId: { type: integer }
+            contenido: { type: string }
+            idCliente: { type: string }
+        - type: object
+          required: [tipo, otroId]
+          properties:
+            tipo: { const: leer }
+            otroId: { type: integer }
+        - type: object
+          required: [tipo, destinatarioId]
+          properties:
+            tipo: { const: escribiendo }
+            destinatarioId: { type: integer }
+        - type: object
+          required: [tipo]
+          properties:
+            tipo: { const: ping }
+    EventoNavegador:
+      description: Lo que el orquestador envía por el WebSocket. Se distingue por «tipo».
+      oneOf:
+        - $ref: '#/components/schemas/EventoListo'
+        - $ref: '#/components/schemas/EventoPong'
+        - $ref: '#/components/schemas/EventoEnviado'
+        - $ref: '#/components/schemas/EventoError'
+        - $ref: '#/components/schemas/EventoMensaje'
+        - $ref: '#/components/schemas/EventoLeidos'
+        - $ref: '#/components/schemas/EventoEscribiendo'
+        - $ref: '#/components/schemas/EventoAlerta'
+        - $ref: '#/components/schemas/EventoBloqueo'
+      discriminator:
+        propertyName: tipo
+    EventoListo:
+      type: object
+      required: [tipo, usuarioId]
+      properties:
+        tipo: { const: listo }
+        usuarioId: { type: integer }
+    EventoPong:
+      type: object
+      required: [tipo]
+      properties:
+        tipo: { const: pong }
+    EventoEnviado:
+      type: object
+      required: [tipo, idCliente, mensaje]
+      properties:
+        tipo: { const: enviado }
+        idCliente: { type: string }
+        mensaje: { $ref: '#/components/schemas/Mensaje' }
+    EventoError:
+      type: object
+      required: [tipo, idCliente, mensaje]
+      properties:
+        tipo: { const: error }
+        idCliente: { type: [string, 'null'] }
+        mensaje: { type: string }
+    EventoMensaje:
+      type: object
+      required: [tipo, mensaje]
+      properties:
+        tipo: { const: mensaje }
+        mensaje: { $ref: '#/components/schemas/Mensaje' }
+    EventoLeidos:
+      type: object
+      required: [tipo, lectorId, remitenteId, leidoEn]
+      properties:
+        tipo: { const: leidos }
+        lectorId: { type: integer }
+        remitenteId: { type: integer }
+        leidoEn: { type: string, format: date-time }
+    EventoEscribiendo:
+      type: object
+      required: [tipo, usuarioId]
+      properties:
+        tipo: { const: escribiendo }
+        usuarioId: { type: integer }
+    EventoAlerta:
+      type: object
+      required: [tipo, usuarioId]
+      properties:
+        tipo: { const: alerta }
+        usuarioId: { type: integer, description: La cuenta que recibió la alerta }
+    EventoBloqueo:
+      type: object
+      required: [tipo, usuarioId]
+      properties:
+        tipo: { const: bloqueo }
+        usuarioId: { type: integer, description: La otra persona del bloqueo o desbloqueo }
+
+    # ---------- Moderación ----------
+    PeticionReporte:
+      type: object
+      required: [reportadoId, motivo]
+      properties:
+        reportadoId: { type: integer }
+        motivo: { $ref: '#/components/schemas/MotivoReporte' }
+        detalle: { type: string, maxLength: 500, description: Obligatorio si el motivo es «otro» }
+        bloquear: { type: boolean, default: false }
+    ReporteCreado:
+      type: object
+      required: [alertaActivada]
+      properties:
+        alertaActivada: { type: boolean, description: true solo para el reporte que activó la alerta }
+
+    # ---------- Administración ----------
+    Ficha:
+      type: object
+      required: [id, nombre, email, rol, foto_url]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        email: { type: string }
+        rol: { $ref: '#/components/schemas/Rol' }
+        foto_url: { type: [string, 'null'] }
+    PersonaCorta:
+      type: object
+      required: [id, nombre]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+    ReporteAdmin:
+      type: object
+      required: [id, motivo, detalle, estado, creadoEn, reportante]
+      properties:
+        id: { type: integer, format: int64 }
+        motivo: { $ref: '#/components/schemas/MotivoReporte' }
+        detalle: { type: [string, 'null'] }
+        estado: { $ref: '#/components/schemas/EstadoReporte' }
+        creadoEn: { type: string, format: date-time }
+        reportante:
+          description: null si esa cuenta ya fue borrada
+          oneOf:
+            - $ref: '#/components/schemas/PersonaCorta'
+            - type: 'null'
+    CuentaReportada:
+      type: object
+      required: [persona, alerta, suspendida, reportes]
+      properties:
+        persona: { $ref: '#/components/schemas/Ficha' }
+        alerta: { type: boolean }
+        suspendida: { type: boolean }
+        reportes:
+          type: array
+          items: { $ref: '#/components/schemas/ReporteAdmin' }
+    Suspension:
+      type: object
+      required: [persona, motivo, creadaEn, suspendidaPor]
+      properties:
+        persona: { $ref: '#/components/schemas/Ficha' }
+        motivo: { type: string }
+        creadaEn: { type: string, format: date-time }
+        suspendidaPor:
+          oneOf:
+            - $ref: '#/components/schemas/PersonaCorta'
+            - type: 'null'
+    ResumenAdmin:
+      type: object
+      required: [cuentasPorRevisar, reportesPendientes, alertasActivas, cuentasSuspendidas]
+      properties:
+        cuentasPorRevisar: { type: integer }
+        reportesPendientes: { type: integer }
+        alertasActivas: { type: integer }
+        cuentasSuspendidas: { type: integer }
