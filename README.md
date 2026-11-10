@@ -114,6 +114,53 @@ Todo queda guardado: `reportes.estado`, `revisado_por` y `revisado_en`, y la tab
 
 `servicios/perfiles` filtra, calcula el puntaje y entrega una página cada vez (`GET /api/perfiles/buscar`). Las reglas del puntaje están en SQL porque hay que conocerlo antes de traer a las personas para poder ordenar por él, y también en el Web Worker del frontend, que además explica las razones. Si cambian, hay que cambiarlas en los dos.
 
+## Conceptos aplicados
+
+### Contract-first
+
+Los contratos se escriben antes que el código y el código se genera o se comprueba contra ellos.
+
+| Comunicación | Contrato | Cómo se garantiza |
+|---|---|---|
+| Entre microservicios (gRPC) | `contratos/src/main/proto/*.proto` | Maven genera las clases Java; si el código no las usa bien, no compila |
+| Navegador y orquestador (REST y WebSocket) | `contratos/src/main/openapi/roomiesfind-api.yaml` | `ContratoRestTest` falla si sobra o falta una ruta, o si un campo de respuesta cambia de nombre |
+
+El frontend genera sus tipos de TypeScript desde el mismo `roomiesfind-api.yaml` (`npm run contrato`).
+
+### Tipado end-to-end
+
+Un mismo dato tiene tipo en todo el camino, sin `Map<String, Object>` ni `any`:
+
+```text
+PostgreSQL ─► record del servicio ─► mensaje protobuf ─► record de infraestructura/contrato ─► JSON ─► tipo TS generado
+              (PerfilDto)             (Perfil)             (PersonaRespuesta)                         (Persona)
+```
+
+- Las respuestas REST son `record` de Java en `infraestructura/.../contrato`.
+- Los mensajes del WebSocket son una jerarquía cerrada (`sealed interface EventoNavegador`): si se agrega un evento, el compilador obliga a manejarlo y la prueba del contrato obliga a documentarlo.
+- **Trade-off:** el contrato REST conserva nombres en snake_case (`usuario_id`, `foto_url`) para no romper el frontend existente. Unificarlos sería más limpio, pero obligaría a cambiar ambos lados a la vez.
+
+### Manejo de hilos
+
+| Dónde | Qué se hizo | Por qué |
+|---|---|---|
+| Orquestador (Tomcat) | `spring.threads.virtual.enabled=true` | Cada petición pasa casi todo el tiempo esperando respuestas gRPC; un hilo virtual que espera no ocupa un hilo del sistema operativo |
+| Servidores gRPC (`comun/ServidorGrpc`) | Un hilo virtual por llamada | Las llamadas esperan a la base de datos; no hay que adivinar el tamaño de un pool |
+| `orquestacion/EnParalelo` | Llamadas gRPC independientes al mismo tiempo (por ejemplo, nombres y alertas de una página de personas) | El tiempo total es el de la llamada más lenta y no la suma |
+| `chat/eventos/PublicadorEventos` | Un único hilo con cola acotada para publicar en Redis | Conserva el orden de los eventos y enviar un mensaje no espera a Redis |
+| `chat/ChatWebSocket` | Un hilo programado cierra las conexiones que no se autentican en 5 s | No bloquea los hilos que atienden mensajes |
+
+**Trade-offs:** los hilos virtuales no aceleran el cálculo, solo la espera; si el trabajo fuera de CPU, convendría un pool fijo. `StructuredTaskScope` (Java 21) expresaría mejor las tareas en paralelo, pero sigue en *preview*, así que se usó un `ExecutorService` estable. El pool de conexiones a la base sigue siendo pequeño (3 por servicio): los hilos virtuales esperan su turno en él en vez de saturar Neon.
+
+### Paradigmas
+
+- **Orientado a objetos con capas** en cada microservicio (`api → controller → service → repository`).
+- **Funcional** en las transformaciones de datos: `record` inmutables, `stream()`, `switch` con *pattern matching* sobre la jerarquía `sealed`.
+- **Orientado a eventos** en el chat: publicar y suscribirse en Redis, y streams de gRPC hacia el WebSocket.
+- **Consistencia por compensación (Saga)** en el registro: si crear el perfil falla, se borra el usuario (`RegistroOrquestador`).
+
+**Trade-off general:** microservicios con una sola base de datos. Se gana separación de responsabilidades y contratos claros; se pierde la transacción única (por eso la compensación) y cada pantalla necesita varias llamadas gRPC (por eso el paralelismo).
+
 ## Ejecutar
 
 Con Docker no hace falta instalar Java:
