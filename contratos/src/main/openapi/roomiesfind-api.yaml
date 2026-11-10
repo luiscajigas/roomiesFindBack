@@ -708,6 +708,16 @@ components:
         - $ref: '#/components/schemas/EventoBloqueo'
       discriminator:
         propertyName: tipo
+        mapping:
+          listo: '#/components/schemas/EventoListo'
+          pong: '#/components/schemas/EventoPong'
+          enviado: '#/components/schemas/EventoEnviado'
+          error: '#/components/schemas/EventoError'
+          mensaje: '#/components/schemas/EventoMensaje'
+          leidos: '#/components/schemas/EventoLeidos'
+          escribiendo: '#/components/schemas/EventoEscribiendo'
+          alerta: '#/components/schemas/EventoAlerta'
+          bloqueo: '#/components/schemas/EventoBloqueo'
     EventoListo:
       type: object
       required: [tipo, usuarioId]
